@@ -1,0 +1,6 @@
+{
+  "files.associations": {
+    "qtwidgets": "cpp",
+    "system_error": "cpp"
+  }
+}
