@@ -15,24 +15,6 @@ private:
     QColor globalColor = Qt::blue;
     unsigned char rastAlg = 0;
 
-    bool drawLineActivated = false;
-    QVector<QPoint> linePoints;
-
-    bool drawPolygonActivated = false;
-    QVector<QPoint> polygonPoints;
-
-    bool drawCircleActivated = false;
-    QVector<QPoint> circlePoints;
-
-    bool drawHermitActivated = false;
-    QVector<QVector<QPoint>> hermitData;
-
-    bool drawBezierActivated = false;
-    QVector<QPoint> bezierPoints;
-
-    bool drawCoonsActivated = false;
-    QVector<QPoint> coonsPoints;
-
     bool isTranslating = false;
     QPoint translateOrigin = QPoint(0, 0);
 
@@ -60,11 +42,7 @@ public:
 
     //// Drawing ////
 
-    void drawAll() { drawAll(globalColor, rastAlg); }
-    void drawAll(QColor color, unsigned int algType);
-
     // Line
-    void drawLine(QColor color, int algType);
     void drawLine(QPoint start, QPoint end, QColor color, int algType);
 
     void DDA(QPoint start, QPoint end, QColor color);
@@ -75,89 +53,23 @@ public:
     void Bresenhamm_x(QPoint start, QPoint end, QColor color, double m);
     void Bresenhamm_y(QPoint start, QPoint end, QColor color, double m);
 
-    void setLineBegin(QPoint begin) { linePoints.push_back(begin); }
-    QPoint getLineBegin() { return linePoints.at(0); }
-    void setLineEnd(QPoint end) { linePoints.push_back(end); }
-    QPoint getLineEnd() { return linePoints.at(1); }
-    void setDrawLineActivated(bool state) { drawLineActivated = state; }
-    bool getDrawLineActivated() { return drawLineActivated; }
-
     // Polygon
-    void setDrawPolygonActivated(bool state) { drawPolygonActivated = state; }
-    bool getDrawPolygonActivated() { return drawPolygonActivated; }
-
-    void startPolygonDraw(QColor color, int algType);
-    void addPolygonPoint(QPoint point);
-    void endPolygonDraw();
-    void drawPolygon() { drawPolygon(globalColor, rastAlg); }
-    void drawPolygon(QColor color, int algType);
+    void drawPolygon(QVector<QPoint> points) { drawPolygon(points, globalColor, rastAlg); }
+    void drawPolygon(QVector<QPoint> points, QColor color, int algType);
     void fillPolygon(QVector<QPoint> points, QColor color);
     void fillTriangle(QVector<QPoint> points, QColor color);
 
-    // Circle
-    void setDrawCircleActivated(bool state) { drawCircleActivated = state; }
-    bool getDrawCircleActivated() { return drawCircleActivated; }
-    void setCircleCenter(QPoint center) { circlePoints.push_back(center); }
-    void setCirclePoint(QPoint point) { circlePoints.push_back(point); }
-    void drawCircle(QColor color);
-
-    // Hermit
-    void setDrawHermitActivated(bool state) { drawHermitActivated = state; }
-    bool getDrawHermitActivated() { return drawHermitActivated; }
-    void addHermitPoint(QPoint point, QPoint tangent)
-    {
-        QVector<QPoint> t = {point, tangent};
-        hermitData.push_back(t);
-    }
-    QVector<QVector<QPoint>> getHermitData() { return hermitData; }
-    void editHermitPointTangent(unsigned int index, QPoint new_tangent)
-    {
-        if (hermitData.size() > index)
-            hermitData[index][1] = new_tangent;
-    }
-    void clearHermitData() { hermitData.clear(); }
-    void drawHermit() { drawHermit(globalColor); }
-    void drawHermit(QColor color);
-
-    // Bezier
-    void setDrawBezierActivated(bool state) { drawBezierActivated = state; }
-    bool getDrawBezierActivated() { return drawBezierActivated; }
-    void addBezierPoint(QPoint point) { bezierPoints.push_back(point); }
-    void clearBezierPoints() { bezierPoints.clear(); }
-    void drawBezier() { drawBezier(globalColor); }
-    void drawBezier(QColor color);
-
-    // Coons b-spline
-    void setDrawCoonsActivated(bool state) { drawCoonsActivated = state; }
-    bool getDrawCoonsActivated() { return drawCoonsActivated; }
-    void addCoonsPoint(QPoint point) { coonsPoints.push_back(point); }
-    void clearCoonsPoints() { coonsPoints.clear(); }
-    void drawCoons() { drawCoons(globalColor); }
-    void drawCoons(QColor color);
+    // 3D Object
+    void drawObject() { return; } // TODO
 
     //// Transforms ////
 
     // Translations
+    bool getIsTranslating() { return isTranslating; }
     void translatePoint(QPoint &point, QPoint offset);
     void startTranslation(QPoint origin);
-    void translateObjects(QPoint new_location);
+    void translateObject(QPoint new_location);
     void endTranslation();
-
-    // Scaling
-    void scalePoint(QPoint &point, QPoint origin, double scale_x, double scale_y);
-    void scaleObjects(double scale_x, double scale_y);
-
-    // Rotations
-    void rotatePoint(QPoint &point, QPoint origin, double angle, bool isDegrees, bool isClockwise);
-    void rotateObjects(double angle, bool isDegrees, bool isClockwise);
-
-    // Shear
-    void shearPoint(QPoint &point, double factor);
-    void shearObjects(double factor);
-
-    // Symmetry
-    void symmetryPoint(QPoint &point, QPoint axis_point_1, QPoint axis_point_2);
-    void symmetryPolygon(unsigned int edge_index);
 
     //// Clipping ////
 
@@ -175,8 +87,6 @@ public:
 
     int getImgWidth() { return img->width(); };
     int getImgHeight() { return img->height(); };
-
-    bool getIsTranslating() { return isTranslating; }
 
     void delete_objects();
     void clear();

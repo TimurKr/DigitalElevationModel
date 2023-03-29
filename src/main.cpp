@@ -1,4 +1,4 @@
-#include "3DViewer.h"
+#include "ThreeDViewer.h"
 #include <QtWidgets/QApplication>
 
 int main(int argc, char *argv[])
@@ -6,10 +6,10 @@ int main(int argc, char *argv[])
 	QLocale::setDefault(QLocale::c());
 
 	QCoreApplication::setOrganizationName("MPM");
-	QCoreApplication::setApplicationName("3DViewer");
+	QCoreApplication::setApplicationName("ThreeDViewer");
 
 	QApplication a(argc, argv);
-	3DViewer w;
+	ThreeDViewer w;
 	w.show();
 	return a.exec();
 }

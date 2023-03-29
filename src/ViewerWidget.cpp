@@ -140,26 +140,7 @@ void ViewerWidget::setPixel(int x, int y, const QColor &color)
 
 //// DRAWING ////
 
-void ViewerWidget::drawAll(QColor color, unsigned int algType)
-{
-    drawLine(color, algType);
-    drawPolygon(color, algType);
-    drawCircle(color);
-    drawHermit(color);
-    drawBezier(color);
-    drawCoons(color);
-}
-
 // Draw Line functions
-void ViewerWidget::drawLine(QColor color, int algType)
-{
-    if (linePoints.length() != 2)
-        return;
-    if (linePoints[0] != linePoints[1])
-    {
-        drawLine(linePoints[0], linePoints[1], color, algType);
-    }
-}
 void ViewerWidget::drawLine(QPoint start, QPoint end, QColor color, int algType)
 {
     if (start == end)
@@ -394,65 +375,26 @@ void ViewerWidget::Bresenhamm_y(QPoint start, QPoint end, QColor color, double m
 }
 
 // Draw polygon functions
-void ViewerWidget::startPolygonDraw(QColor color, int algType)
+void ViewerWidget::drawPolygon(QVector<QPoint> points, QColor color, int algType)
 {
-    globalColor = color;
-    rastAlg = algType;
-    clear();
-    setDrawPolygonActivated(true);
-    polygonPoints.clear();
-}
-void ViewerWidget::endPolygonDraw()
-{
-    setDrawPolygonActivated(false);
-    if (polygonPoints.size() < 2)
-    {
-        polygonPoints.clear();
-        return;
-    }
-    if (polygonPoints.size() > 2)
-    {
-        polygonPoints.push_back(polygonPoints[0]);
-    }
-    drawPolygon(globalColor, rastAlg);
-}
-void ViewerWidget::addPolygonPoint(QPoint point)
-{
-    polygonPoints.push_back(point);
-    drawPolygon(globalColor, rastAlg);
-}
-void ViewerWidget::drawPolygon(QColor color, int algType)
-{
-    if (!isPolygonInside(polygonPoints))
+    if (!isPolygonInside(points))
         return;
 
-    if (polygonPoints.size() < 2)
+    if (points.size() < 2)
         return;
 
-    if (polygonPoints.size() == 2)
+    if (points.size() == 2)
     {
-        QPoint start = polygonPoints[0], end = polygonPoints[1];
-        clipLine(polygonPoints[0], polygonPoints[1], start, end);
+        QPoint start = points[0], end = points[1];
+        clipLine(points[0], points[1], start, end);
         drawLine(start, end, color, algType);
         return;
     }
-    QVector<QPoint> clippedPolygon;
+    QVector<QPoint> clippedPolygon = clipPolygon(points);
 
-    if (!drawPolygonActivated)
-    {
-        clippedPolygon = clipPolygon(polygonPoints);
-    }
-    else
-    {
-        clippedPolygon = polygonPoints;
-    }
     if (clippedPolygon.size() < 1)
         return;
 
-    if (!drawPolygonActivated)
-    {
-        fillPolygon(clippedPolygon, color);
-    }
     for (int i = 0; i < clippedPolygon.size() - 1; i++)
     {
         drawLine(clippedPolygon[i], clippedPolygon[i + 1], color, algType);
@@ -567,7 +509,6 @@ void ViewerWidget::fillPolygon(QVector<QPoint> points, QColor color)
             if (ZAH[j].x != ZAH[j + 1].x)
             {
                 drawLine(QPoint(ZAH[j].x + 0.5, y), QPoint(ZAH[j + 1].x + 0.5, y), color, 0);
-                // drawLine(QPoint(ZAH[j].x, y), QPoint(ZAH[j + 1].x + 1, y), color, 0);
             }
         }
 
@@ -665,162 +606,6 @@ void ViewerWidget::fillTriangle(QVector<QPoint> points, QColor color)
     }
 }
 
-// Draw circle
-void ViewerWidget::drawCircle(QColor color)
-{
-
-    if (circlePoints.size() != 2)
-        return;
-
-    auto draw_all_octagons = [=](QPoint point)
-    {
-        point = point - circlePoints[0];
-
-        QVector<QPoint> octagons = {
-            point,
-            QPoint(point.x(), -point.y()),
-            QPoint(-point.x(), point.y()),
-            QPoint(-point.x(), -point.y()),
-            QPoint(point.y(), point.x()),
-            QPoint(point.y(), -point.x()),
-            QPoint(-point.y(), point.x()),
-            QPoint(-point.y(), -point.x())};
-        for (auto octagon : octagons)
-        {
-            if (isInside(octagon + circlePoints[0]))
-                setPixel(octagon + circlePoints[0], color);
-        }
-    };
-
-    double radius = sqrt(pow(circlePoints[0].x() - circlePoints[1].x(), 2) + pow(circlePoints[0].y() - circlePoints[1].y(), 2));
-    double p = 1 - radius;
-    int x = 0, y = radius;
-    int double_x = 3, double_y = 2 * radius - 2;
-
-    while (x <= y)
-    {
-        draw_all_octagons(QPoint(x, y) + circlePoints[0]);
-
-        if (p > 0)
-        {
-            p -= double_y;
-            y--;
-            double_y -= 2;
-        }
-        p += double_x;
-        x++;
-        double_x += 2;
-    }
-
-    update();
-}
-
-// Draw Hermit
-void ViewerWidget::drawHermit(QColor color)
-{
-
-    if (hermitData.size() < 2)
-        return;
-
-    auto f0 = [=](double t)
-    { return 2 * pow(t, 3) - 3 * pow(t, 2) + 1; };
-    auto f1 = [=](double t)
-    { return -2 * pow(t, 3) + 3 * pow(t, 2); };
-    auto f2 = [=](double t)
-    { return pow(t, 3) - 2 * pow(t, 2) + t; };
-    auto f3 = [=](double t)
-    { return pow(t, 3) - pow(t, 2); };
-
-    if (hermitData.size() < 2)
-        return;
-
-    double dt = 0.05;
-    double t = 0;
-
-    drawLine(hermitData[0][0], hermitData[0][0] + hermitData[0][1], QColor(Qt::red), rastAlg);
-    for (int i = 1; i < hermitData.size(); i++)
-    {
-        drawLine(hermitData[i][0], hermitData[i][0] + hermitData[i][1], QColor(Qt::red), rastAlg);
-        QPoint Q_0 = hermitData[i - 1][0];
-        t = dt;
-        while (t < 1)
-        {
-            QPoint Q_1 = hermitData[i - 1][0] * f0(t) + hermitData[i][0] * f1(t) + hermitData[i - 1][1] * f2(t) + hermitData[i][1] * f3(t);
-            drawLine(Q_0, Q_1, color, rastAlg);
-            Q_0 = Q_1;
-            t += dt;
-        }
-        drawLine(Q_0, hermitData[i][0], color, rastAlg);
-    }
-}
-
-// Draw Bezier
-void ViewerWidget::drawBezier(QColor color)
-{
-    if (bezierPoints.size() < 2)
-        return;
-
-    for (int i = 1; i < bezierPoints.size(); i++)
-    {
-        drawLine(bezierPoints[i - 1], bezierPoints[i], QColor(Qt::red), rastAlg);
-    }
-
-    QVector<QPoint> points = bezierPoints;
-    double dt = 1. / (10 * bezierPoints.size());
-    QPoint Q_0 = points[0];
-    for (double t = dt; t < 1; t += dt)
-    {
-        points = bezierPoints;
-        while (points.size() > 1)
-        {
-            for (int i = 1; i < points.size(); i++)
-            {
-                points[i - 1] = (points[i - 1] * (1 - t) + points[i] * t);
-            }
-            points.pop_back();
-        }
-        drawLine(Q_0, points[0], color, rastAlg);
-        Q_0 = points[0];
-    }
-    drawLine(Q_0, bezierPoints[bezierPoints.size() - 1], color, rastAlg);
-}
-
-// Draw Coons B-Spline
-void ViewerWidget::drawCoons(QColor color)
-{
-
-    for (int i = 1; i < coonsPoints.size(); i++)
-    {
-        drawLine(coonsPoints[i - 1], coonsPoints[i], QColor(Qt::red), rastAlg);
-    }
-
-    if (coonsPoints.size() < 4)
-        return;
-
-    auto b0 = [=](double t)
-    { return -pow(t, 3) / 6 + pow(t, 2) / 2 - t / 2 + 1. / 6; };
-    auto b1 = [=](double t)
-    { return pow(t, 3) / 2 - pow(t, 2) + 2. / 3; };
-    auto b2 = [=](double t)
-    { return -pow(t, 3) / 2 + pow(t, 2) / 2 + t / 2 + 1. / 6; };
-    auto b3 = [=](double t)
-    { return pow(t, 3) / 6; };
-
-    double dt = 0.05;
-    for (int i = 3; i < coonsPoints.size(); i++)
-    {
-        double t = 0;
-        QPoint Q_0 = coonsPoints[i - 3] * b0(0) + coonsPoints[i - 2] * b1(0) + coonsPoints[i - 1] * b2(0) + coonsPoints[i] * b3(0);
-        while (t < 1)
-        {
-            t += dt;
-            QPoint Q_1 = coonsPoints[i - 3] * b0(t) + coonsPoints[i - 2] * b1(t) + coonsPoints[i - 1] * b2(t) + coonsPoints[i] * b3(t);
-            drawLine(Q_0, Q_1, color, rastAlg);
-            Q_0 = Q_1;
-        }
-    }
-}
-
 //// TRANSFORMATIONS ////
 
 // Translations
@@ -833,7 +618,7 @@ void ViewerWidget::startTranslation(QPoint origin)
     isTranslating = true;
     translateOrigin = origin;
 }
-void ViewerWidget::translateObjects(QPoint new_location)
+void ViewerWidget::translateObject(QPoint new_location)
 {
 
     if (!isTranslating)
@@ -842,209 +627,13 @@ void ViewerWidget::translateObjects(QPoint new_location)
     clear();
 
     QPoint offset = new_location - translateOrigin;
-    if (linePoints.size() > 0)
-    {
-        for (int i = 0; i < linePoints.size(); i++)
-        {
-            translatePoint(linePoints[i], offset);
-        }
-    }
-    if (polygonPoints.size() > 0)
-    {
-        for (int i = 0; i < polygonPoints.size(); i++)
-        {
-            translatePoint(polygonPoints[i], offset);
-        }
-    }
-    if (circlePoints.size() > 0)
-    {
-        for (int i = 0; i < circlePoints.size(); i++)
-        {
-            translatePoint(circlePoints[i], offset);
-        }
-    }
-    if (hermitData.size() > 0)
-    {
-        for (int i = 0; i < hermitData.size(); i++)
-        {
-            translatePoint(hermitData[i][0], offset);
-        }
-    }
-    if (bezierPoints.size() > 0)
-    {
-        for (int i = 0; i < bezierPoints.size(); i++)
-        {
-            translatePoint(bezierPoints[i], offset);
-        }
-    }
-    if (coonsPoints.size() > 0)
-    {
-        for (int i = 0; i < coonsPoints.size(); i++)
-        {
-            translatePoint(coonsPoints[i], offset);
-        }
-    }
     translateOrigin = new_location;
 
-    drawAll();
+    drawObject();
 }
 void ViewerWidget::endTranslation()
 {
     isTranslating = false;
-}
-
-// Scaling
-void ViewerWidget::scalePoint(QPoint &point, QPoint origin, double scale_x, double scale_y)
-{
-    point -= origin;
-
-    point.setX(point.x() * scale_x + 0.5);
-    point.setY(point.y() * scale_y + 0.5);
-
-    point += origin;
-}
-void ViewerWidget::scaleObjects(double scale_x, double scale_y)
-{
-    clear();
-    if (polygonPoints.size() > 0)
-    {
-        QPoint center = polygonPoints[0];
-        for (int i = 0; i < polygonPoints.size(); i++)
-        {
-            scalePoint(polygonPoints[i], center, scale_x, scale_y);
-        }
-    }
-    if (linePoints.size() == 2)
-    {
-        scalePoint(linePoints[1], linePoints[0], scale_x, scale_y);
-        drawLine(globalColor, rastAlg);
-    }
-    if (circlePoints.size() == 2)
-    {
-        scalePoint(circlePoints[1], circlePoints[0], scale_x, scale_y);
-    }
-    if (bezierPoints.size() >= 2)
-    {
-        for (int i = 1; i < bezierPoints.size(); i++)
-        {
-            scalePoint(bezierPoints[i], bezierPoints[0], scale_x, scale_y);
-        }
-    }
-    if (coonsPoints.size() >= 4)
-    {
-        for (int i = 1; i < coonsPoints.size(); i++)
-        {
-            scalePoint(coonsPoints[i], coonsPoints[0], scale_x, scale_y);
-        }
-    }
-    drawAll();
-}
-
-// Rotation
-void ViewerWidget::rotatePoint(QPoint &point, QPoint origin, double angle, bool isDegrees, bool isClockwise)
-{
-    if (isDegrees)
-        angle = angle * M_PI / 180;
-
-    if (isClockwise)
-        angle = -angle;
-
-    point -= origin;
-
-    point.setX(point.x() * std::cos(angle) - point.y() * std::sin(angle) + 0.5);
-    point.setY(point.x() * std::sin(angle) + point.y() * std::cos(angle) + 0.5);
-
-    point += origin;
-}
-void ViewerWidget::rotateObjects(double angle, bool isDegrees, bool isClockwise)
-{
-    clear();
-    if (linePoints.size() == 2)
-    {
-        rotatePoint(linePoints[1], linePoints[0], angle, isDegrees, isClockwise);
-    }
-    if (polygonPoints.size() > 0)
-    {
-        for (int i = 0; i < polygonPoints.size(); i++)
-        {
-            rotatePoint(polygonPoints[i], polygonPoints[0], angle, isDegrees, isClockwise);
-        }
-    }
-    if (bezierPoints.size() >= 2)
-    {
-        for (int i = 1; i < bezierPoints.size(); i++)
-        {
-            rotatePoint(bezierPoints[i], bezierPoints[0], angle, isDegrees, isClockwise);
-        }
-    }
-    if (coonsPoints.size() >= 4)
-    {
-        for (int i = 1; i < coonsPoints.size(); i++)
-        {
-            rotatePoint(coonsPoints[i], coonsPoints[0], angle, isDegrees, isClockwise);
-        }
-    }
-    drawAll();
-}
-
-// Shear
-void ViewerWidget::shearPoint(QPoint &point, double factor)
-{
-    QPoint center = polygonPoints[0];
-    point -= center;
-
-    point.setX(point.x() + point.y() * factor + 0.5);
-
-    point += center;
-}
-void ViewerWidget::shearObjects(double factor)
-{
-    clear();
-
-    if (linePoints.size() == 2)
-    {
-        shearPoint(linePoints[1], factor);
-    }
-    if (polygonPoints.size() >= 2)
-    {
-        for (int i = 0; i < polygonPoints.size(); i++)
-        {
-            shearPoint(polygonPoints[i], factor);
-        }
-    }
-    drawAll();
-}
-
-// Symmetry
-void ViewerWidget::symmetryPoint(QPoint &point, QPoint axis_point_1, QPoint axis_point_2)
-{
-    QPoint axis_vector = axis_point_2 - axis_point_1;
-
-    double a = axis_vector.y();
-    double b = -axis_vector.x();
-    double c = -a * axis_point_1.x() - b * axis_point_1.y();
-    double x = point.x();
-    double y = point.y();
-
-    point = QPoint(
-        point.x() - 2 * a * (a * x + b * y + c) / (a * a + b * b),
-        point.y() - 2 * b * (a * x + b * y + c) / (a * a + b * b));
-}
-void ViewerWidget::symmetryPolygon(unsigned int edge_index)
-{
-    if (polygonPoints.size() == 0)
-        return;
-
-    QPoint axis_point_1 = polygonPoints[edge_index % (polygonPoints.size() - 1)];
-    QPoint axis_point_2 = polygonPoints[(edge_index + 1) % (polygonPoints.size() - 1)];
-
-    for (int i = 0; i < polygonPoints.size(); i++)
-    {
-        symmetryPoint(polygonPoints[i], axis_point_1, axis_point_2);
-    }
-
-    clear();
-    drawAll();
 }
 
 //// Clipping ////
@@ -1177,12 +766,6 @@ QVector<QPoint> ViewerWidget::clipPolygon(QVector<QPoint> polygon)
 
 void ViewerWidget::delete_objects()
 {
-    linePoints.clear();
-    polygonPoints.clear();
-    circlePoints.clear();
-    hermitData.clear();
-    bezierPoints.clear();
-    coonsPoints.clear();
     update();
 }
 
