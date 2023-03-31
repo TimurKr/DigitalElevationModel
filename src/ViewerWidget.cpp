@@ -138,6 +138,102 @@ void ViewerWidget::setPixel(int x, int y, const QColor &color)
     }
 }
 
+//// OBJECT ////
+
+void ViewerWidget::debugObject()
+{
+    for (std::list<Face>::iterator it = object.faces.begin(); it != object.faces.end(); ++it)
+    {
+        Face *face_ptr = &(*it);
+        Edge *edge = face_ptr->edge;
+        qDebug() << "Face" << face_ptr << ":";
+        while (true)
+        {
+            qDebug() << "\tEdge" << edge << ":";
+            qDebug() << "\tVrchol: (" << edge->origin->x << ", " << edge->origin->y << ", " << edge->origin->z << ")";
+            qDebug() << "\tFace ptr: " << edge->face;
+            qDebug() << "\tEdge next: " << edge->next;
+            qDebug() << "\tEdge prev: " << edge->prev;
+            qDebug() << "\tEdge pair: " << edge->pair;
+            qDebug() << "";
+            edge = edge->next;
+            if (edge == face_ptr->edge)
+                break;
+        }
+        qDebug() << "---------------------";
+    }
+}
+
+void ViewerWidget::loadObject(QVector<QVector3D> vertices, QVector<QVector<unsigned int>> polygons)
+{
+    object.clear();
+
+    // Load vertices
+    for (int i = 0; i < vertices.size(); i++)
+    {
+        Vertex vertex;
+        vertex.x = vertices[i].x();
+        vertex.y = vertices[i].y();
+        vertex.z = vertices[i].z();
+        object.vertices.push_back(vertex);
+    }
+
+    // Load edges and faces
+    for (int i = 0; i < polygons.size(); i++)
+    {
+        object.faces.push_back(Face());
+        Face *face_ptr = &object.faces.back();
+
+        Edge *prev_edge = nullptr;
+        for (int j = 0; j < polygons[i].size(); j++)
+        {
+            object.edges.push_back(Edge());
+            Edge *edge = &object.edges.back();
+
+            // Origin
+            edge->origin = &(*std::next(object.vertices.begin(), polygons[i][j]));
+            edge->origin->edges.push_back(edge);
+
+            // Face
+            edge->face = face_ptr;
+            if (j == 0)
+                face_ptr->edge = edge;
+
+            // Linking
+            if (prev_edge != nullptr)
+            {
+                prev_edge->next = edge;
+                edge->prev = prev_edge;
+            }
+
+            // Pairing
+            Vertex *end = &(*std::next(object.vertices.begin(), polygons[i][(j + 1) % polygons[i].size()]));
+            for (int k = 0; k < end->edges.size(); k++)
+            {
+                if (end->edges[k]->next->origin == edge->origin)
+                {
+                    edge->pair = end->edges[k];
+                    end->edges[k]->pair = edge;
+                }
+            }
+
+            prev_edge = edge;
+        }
+        // Linking last edge
+        prev_edge->next = face_ptr->edge;
+        face_ptr->edge->prev = prev_edge;
+    }
+
+    translateObject(QVector3D(-0.5, -0.5, -0.5));
+}
+
+void ViewerWidget::translateObject(QVector3D offset)
+{
+    debugObject();
+    object.translate(offset);
+    debugObject();
+}
+
 //// DRAWING ////
 
 // Draw Line functions
@@ -606,34 +702,64 @@ void ViewerWidget::fillTriangle(QVector<QPoint> points, QColor color)
     }
 }
 
-//// TRANSFORMATIONS ////
-
-// Translations
-void ViewerWidget::translatePoint(QPoint &point, QPoint offset)
+// 3D Object
+void ViewerWidget::drawObject(ThreeDObject object)
 {
-    point += offset;
+    for (auto face : object.faces)
+    {
+        QVector<QPoint> polygon;
+
+        for (Edge *edge; edge == face.edge; edge = edge->next)
+        {
+            polygon.push_back(QPoint(edge->origin->x, edge->origin->y));
+        }
+
+        drawPolygon(polygon);
+    }
 }
-void ViewerWidget::startTranslation(QPoint origin)
+void ViewerWidget::drawObject(ThreeDObject object, QVector3D camera_position, double zenit, double azimuth, double center_of_projection)
 {
-    isTranslating = true;
-    translateOrigin = origin;
+    transformToViewingCoordinates(object, camera_position, zenit, azimuth);
+    if (center_of_projection == 0)
+        transformToOrtograpicCoordinates(object);
+    else
+        transformToPerspectiveCoordinates(object, center_of_projection);
+
+    drawObject(object);
 }
-void ViewerWidget::translateObject(QPoint new_location)
+void ViewerWidget::transformToViewingCoordinates(ThreeDObject &object, QVector3D camera_position, double zenit, double azimuth)
 {
+    object.translate(-camera_position);
 
-    if (!isTranslating)
-        return;
+    zenit = zenit * M_PI / 180;
+    azimuth = azimuth * M_PI / 180;
 
-    clear();
+    QVector3D n(sin(zenit) * sin(azimuth), sin(zenit) * cos(azimuth), cos(zenit));
+    QVector3D u(cos(zenit) * sin(azimuth), cos(zenit) * cos(azimuth), -sin(zenit));
+    QVector3D v = QVector3D::crossProduct(n, u);
 
-    QPoint offset = new_location - translateOrigin;
-    translateOrigin = new_location;
-
-    drawObject();
+    for (std::list<Vertex>::iterator it = object.vertices.begin(); it != object.vertices.end(); it++)
+    {
+        QVector3D vertex(it->x, it->y, it->z);
+        it->x = QVector3D::dotProduct(vertex, u);
+        it->y = QVector3D::dotProduct(vertex, v);
+        it->z = QVector3D::dotProduct(vertex, n);
+    }
 }
-void ViewerWidget::endTranslation()
+void ViewerWidget::transformToOrtograpicCoordinates(ThreeDObject &object)
 {
-    isTranslating = false;
+    for (std::list<Vertex>::iterator it = object.vertices.begin(); it != object.vertices.end(); it++)
+    {
+        it->z = 0;
+    }
+}
+void ViewerWidget::transformToPerspectiveCoordinates(ThreeDObject &object, double center_of_projection)
+{
+    for (std::list<Vertex>::iterator it = object.vertices.begin(); it != object.vertices.end(); it++)
+    {
+        it->x = it->x * center_of_projection / (center_of_projection - it->z);
+        it->y = it->y * center_of_projection / (center_of_projection - it->z);
+    }
 }
 
 //// Clipping ////

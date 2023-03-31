@@ -2,6 +2,7 @@
 #include <QtWidgets>
 
 #include <float.h>
+#include "ObjectRepresentation.h"
 
 class ViewerWidget : public QWidget
 {
@@ -15,8 +16,8 @@ private:
     QColor globalColor = Qt::blue;
     unsigned char rastAlg = 0;
 
-    bool isTranslating = false;
-    QPoint translateOrigin = QPoint(0, 0);
+    // Object
+    ThreeDObject object;
 
 public:
     ViewerWidget(QSize imgSize, QWidget *parent = Q_NULLPTR);
@@ -40,6 +41,11 @@ public:
     bool isInside(QPoint point) { return isInside(point.x(), point.y()); }
     bool isPolygonInside(QVector<QPoint> polygon);
 
+    //// 3D Object ////
+    void debugObject();
+    void loadObject(QVector<QVector3D> vertices, QVector<QVector<unsigned int>> polygons);
+    void translateObject(QVector3D offset);
+
     //// Drawing ////
 
     // Line
@@ -60,16 +66,12 @@ public:
     void fillTriangle(QVector<QPoint> points, QColor color);
 
     // 3D Object
-    void drawObject() { return; } // TODO
-
-    //// Transforms ////
-
-    // Translations
-    bool getIsTranslating() { return isTranslating; }
-    void translatePoint(QPoint &point, QPoint offset);
-    void startTranslation(QPoint origin);
-    void translateObject(QPoint new_location);
-    void endTranslation();
+    void drawObject() { drawObject(object, QVector3D(0, 0, 0), 0, 0); }
+    void drawObject(ThreeDObject object);
+    void drawObject(ThreeDObject object, QVector3D camera_position, double zenit, double azimuth, double center_of_projection = 0);
+    void transformToViewingCoordinates(ThreeDObject &object, QVector3D camera_position, double zenit, double azimuth);
+    void transformToOrtograpicCoordinates(ThreeDObject &object);
+    void transformToPerspectiveCoordinates(ThreeDObject &object, double center_of_projection);
 
     //// Clipping ////
 

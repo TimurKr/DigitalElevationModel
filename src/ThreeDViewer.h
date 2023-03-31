@@ -34,8 +34,10 @@ private:
 	// ThreeDViewer Events
 	void closeEvent(QCloseEvent *event);
 
+	// 3D Object functions
+	int loadObject(QString filename);
+
 	// Image functions
-	bool openImage(QString filename);
 	bool saveImage(QString filename);
 
 private slots:

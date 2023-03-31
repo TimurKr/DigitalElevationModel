@@ -73,7 +73,6 @@ void ThreeDViewer ::ViewerWidgetMouseButtonPress(ViewerWidget *w, QEvent *event)
 
 	if (e->button() == Qt::LeftButton)
 	{
-		vW->startTranslation(e->pos());
 	}
 }
 void ThreeDViewer ::ViewerWidgetMouseButtonRelease(ViewerWidget *w, QEvent *event)
@@ -82,15 +81,11 @@ void ThreeDViewer ::ViewerWidgetMouseButtonRelease(ViewerWidget *w, QEvent *even
 
 	if (e->button() == Qt::LeftButton)
 	{
-		vW->endTranslation();
 	}
 }
 void ThreeDViewer ::ViewerWidgetMouseMove(ViewerWidget *w, QEvent *event)
 {
 	QMouseEvent *e = static_cast<QMouseEvent *>(event);
-
-	if (vW->getIsTranslating())
-		vW->translateObject(e->pos());
 }
 void ThreeDViewer ::ViewerWidgetLeave(ViewerWidget *w, QEvent *event)
 {
@@ -124,16 +119,78 @@ void ThreeDViewer ::closeEvent(QCloseEvent *event)
 	}
 }
 
-// Image functions
-bool ThreeDViewer ::openImage(QString filename)
+// 3D Objects
+int ThreeDViewer ::loadObject(QString filename)
 {
-	QImage loadedImg(filename);
-	if (!loadedImg.isNull())
+	QFile file(filename);
+	if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
 	{
-		return vW->setImage(loadedImg);
+		QMessageBox::warning(this, "Error", "Could not open file");
+		return false;
 	}
-	return false;
+
+	QTextStream in(&file);
+	QString line = in.readLine();
+	// Wait for POINTS
+	while (!line.startsWith("POINTS"))
+	{
+		line = in.readLine();
+	}
+
+	// Handle POINTS
+	line = in.readLine();
+	QVector<QVector3D> points;
+	while (!line.startsWith("POLYGONS"))
+	{
+		QStringList list = line.split(" ");
+		QList<double> coordinates;
+
+		// Try converting all strings to doubles
+		bool ok = true;
+		for (int i = 0; i < list.size(); i++)
+		{
+			coordinates.push_back(list[i].toDouble(&ok));
+			if (!ok)
+				return false;
+		}
+		points.push_back(QVector3D(coordinates[0], coordinates[1], coordinates[2]));
+		line = in.readLine();
+	}
+	// Wait for POLYGONS
+	while (!line.startsWith("POLYGONS"))
+	{
+		line = in.readLine();
+	}
+
+	// Handle POLYGONS
+	line = in.readLine();
+	QVector<QVector<unsigned int>> polygons;
+	while (!line.isEmpty())
+	{
+		QStringList list = line.split(" ");
+		QList<unsigned int> coordinates;
+
+		// Try converting all strings to unsigned ints
+		bool ok = true;
+		for (int i = 0; i < list.size(); i++)
+		{
+			coordinates.push_back(list[i].toUInt(&ok));
+			if (!ok)
+				return false;
+		}
+		polygons.push_back(QVector<unsigned int>());
+		for (int i = 1; i < coordinates.size(); i++)
+		{
+			polygons.back().push_back(coordinates[i]);
+		}
+		line = in.readLine();
+	}
+
+	vW->loadObject(points, polygons);
+	return true;
 }
+
+// Image functions
 bool ThreeDViewer ::saveImage(QString filename)
 {
 	QFileInfo fi(filename);
@@ -148,8 +205,10 @@ void ThreeDViewer ::on_actionOpen_triggered()
 {
 	QString folder = settings.value("folder_img_load_path", "").toString();
 
-	QString fileFilter = "Image data (*.bmp *.gif *.jpg *.jpeg *.png *.pbm *.pgm *.ppm .*xbm .* xpm);;All files (*)";
-	QString fileName = QFileDialog::getOpenFileName(this, "Load image", folder, fileFilter);
+	// QString fileFilter = "Image data (*.bmp *.gif *.jpg *.jpeg *.png *.pbm *.pgm *.ppm .*xbm .* xpm);;All files (*)";
+	QString fileFilter = "VTK súbor (*.vtk)";
+
+	QString fileName = QFileDialog::getOpenFileName(this, "Load object", folder, fileFilter);
 	if (fileName.isEmpty())
 	{
 		return;
@@ -158,7 +217,8 @@ void ThreeDViewer ::on_actionOpen_triggered()
 	QFileInfo fi(fileName);
 	settings.setValue("folder_img_load_path", fi.absoluteDir().absolutePath());
 
-	if (!openImage(fileName))
+	int id = loadObject(fileName);
+	if (id == -1)
 	{
 		msgBox.setText("Unable to open image.");
 		msgBox.setIcon(QMessageBox::Warning);
