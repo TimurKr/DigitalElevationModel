@@ -125,9 +125,12 @@
        </property>
        <layout class="QGridLayout" name="gridLayout_2">
         <item row="4" column="1">
-         <widget class="QSlider" name="camera_azimut">
+         <widget class="QSlider" name="camera_azimuth">
+          <property name="cursor">
+           <cursorShape>PointingHandCursor</cursorShape>
+          </property>
           <property name="maximum">
-           <number>390</number>
+           <number>360</number>
           </property>
           <property name="singleStep">
            <number>1</number>
@@ -162,11 +165,23 @@
         </item>
         <item row="3" column="1">
          <widget class="QSlider" name="camera_zenit">
+          <property name="cursor">
+           <cursorShape>PointingHandCursor</cursorShape>
+          </property>
+          <property name="mouseTracking">
+           <bool>false</bool>
+          </property>
+          <property name="tabletTracking">
+           <bool>false</bool>
+          </property>
           <property name="minimum">
            <number>-90</number>
           </property>
           <property name="maximum">
            <number>90</number>
+          </property>
+          <property name="tracking">
+           <bool>true</bool>
           </property>
           <property name="orientation">
            <enum>Qt::Vertical</enum>

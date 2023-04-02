@@ -4,6 +4,14 @@
 #include <float.h>
 #include "ObjectRepresentation.h"
 
+struct Camera
+{
+    QVector3D position;
+    double zenit;
+    double azimuth;
+    double center_of_projection;
+};
+
 class ViewerWidget : public QWidget
 {
     Q_OBJECT
@@ -18,6 +26,9 @@ private:
 
     // Object
     ThreeDObject object;
+
+    // Camera
+    Camera camera;
 
 public:
     ViewerWidget(QSize imgSize, QWidget *parent = Q_NULLPTR);
@@ -39,12 +50,23 @@ public:
     void setPixel(QPoint point, const QColor &color) { setPixel(point.x(), point.y(), color); }
     bool isInside(int x, int y) { return (x >= 10 && y >= 10 && x < img->width() - 10 && y < img->height() - 10) ? true : false; }
     bool isInside(QPoint point) { return isInside(point.x(), point.y()); }
-    bool isPolygonInside(QVector<QPoint> polygon);
+    bool isPolygonInside(std::list<QPoint> polygon);
 
     //// 3D Object ////
-    void debugObject();
+    void debugObject(ThreeDObject &object);
     void loadObject(QVector<QVector3D> vertices, QVector<QVector<unsigned int>> polygons);
     void translateObject(QVector3D offset);
+
+    //// Camera ////
+    void setCamera(QVector3D position, double zenit, double azimuth, double center_of_projection)
+    {
+        camera.position = position;
+        camera.zenit = zenit * M_PI / 180;
+        camera.azimuth = azimuth * M_PI / 180;
+        camera.center_of_projection = center_of_projection;
+        clear();
+        drawObject();
+    }
 
     //// Drawing ////
 
@@ -60,18 +82,18 @@ public:
     void Bresenhamm_y(QPoint start, QPoint end, QColor color, double m);
 
     // Polygon
-    void drawPolygon(QVector<QPoint> points) { drawPolygon(points, globalColor, rastAlg); }
-    void drawPolygon(QVector<QPoint> points, QColor color, int algType);
-    void fillPolygon(QVector<QPoint> points, QColor color);
-    void fillTriangle(QVector<QPoint> points, QColor color);
+    void drawPolygon(std::list<QPoint> polygon) { drawPolygon(polygon, globalColor, rastAlg); }
+    void drawPolygon(std::list<QPoint> polygon, QColor color, int algType);
+    void fillPolygon(std::list<QPoint> polygon, QColor color);
+    void fillTriangle(std::vector<QPoint> polygon, QColor color);
 
     // 3D Object
-    void drawObject() { drawObject(object, QVector3D(0, 0, 0), 0, 0); }
-    void drawObject(ThreeDObject object);
-    void drawObject(ThreeDObject object, QVector3D camera_position, double zenit, double azimuth, double center_of_projection = 0);
-    void transformToViewingCoordinates(ThreeDObject &object, QVector3D camera_position, double zenit, double azimuth);
-    void transformToOrtograpicCoordinates(ThreeDObject &object);
+    void drawObject() { drawObject(object, camera); }
+    void drawObject(ThreeDObject obj, Camera camera);
+    void transformToViewingCoordinates(ThreeDObject &object, Camera camera);
+    void transformToOrtograpicCoordinates(ThreeDObject &obj);
     void transformToPerspectiveCoordinates(ThreeDObject &object, double center_of_projection);
+    void drawObject(ThreeDObject *object);
 
     //// Clipping ////
 
@@ -79,8 +101,8 @@ public:
     void clipLine(QPoint start, QPoint end, QPoint &clip_start, QPoint &clip_end);
 
     // Sutherland-Hodgman
-    QVector<QPoint> clipPolygonLeftSide(QVector<QPoint> polygon, int x_min);
-    QVector<QPoint> clipPolygon(QVector<QPoint> polygon);
+    void clipPolygonLeftSide(std::list<QPoint> &polygon, int x_min);
+    void clipPolygon(std::list<QPoint> &polygon);
 
     // Get/Set functions
     uchar *getData() { return data; }

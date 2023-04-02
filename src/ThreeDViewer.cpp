@@ -14,6 +14,7 @@ ThreeDViewer ::ThreeDViewer(QWidget *parent)
 
 	vW->setObjectName("ViewerWidget");
 	vW->installEventFilter(this);
+	setCamera();
 
 	QColor default_color = Qt::blue;
 	QString style_sheet = QString("background-color: #%1;").arg(default_color.rgba(), 0, 16);

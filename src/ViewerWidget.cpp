@@ -60,11 +60,11 @@ bool ViewerWidget::isEmpty()
     return false;
 }
 
-bool ViewerWidget::isPolygonInside(QVector<QPoint> polygon)
+bool ViewerWidget::isPolygonInside(std::list<QPoint> polygon)
 {
-    for (int i = 0; i < polygon.size(); i++)
+    for (std::list<QPoint>::iterator i = polygon.begin(); i != polygon.end(); ++i)
     {
-        if (isInside(polygon[i]))
+        if (isInside(*i))
         {
             return true;
         }
@@ -140,7 +140,7 @@ void ViewerWidget::setPixel(int x, int y, const QColor &color)
 
 //// OBJECT ////
 
-void ViewerWidget::debugObject()
+void ViewerWidget::debugObject(ThreeDObject &object)
 {
     for (std::list<Face>::iterator it = object.faces.begin(); it != object.faces.end(); ++it)
     {
@@ -149,13 +149,14 @@ void ViewerWidget::debugObject()
         qDebug() << "Face" << face_ptr << ":";
         while (true)
         {
-            qDebug() << "\tEdge" << edge << ":";
-            qDebug() << "\tVrchol: (" << edge->origin->x << ", " << edge->origin->y << ", " << edge->origin->z << ")";
-            qDebug() << "\tFace ptr: " << edge->face;
-            qDebug() << "\tEdge next: " << edge->next;
-            qDebug() << "\tEdge prev: " << edge->prev;
-            qDebug() << "\tEdge pair: " << edge->pair;
-            qDebug() << "";
+            // qDebug() << "\tEdge" << edge << ":";
+            qDebug() << "\tVrchol start: (" << edge->origin->x << ", " << edge->origin->y << ", " << edge->origin->z << ")";
+            // qDebug() << "\tVrchol start: (" << edge->next->origin->x << ", " << edge->next->origin->y << ", " << edge->next->origin->z << ")";
+            // qDebug() << "\tFace ptr: " << edge->face;
+            // qDebug() << "\tEdge next: " << edge->next;
+            // qDebug() << "\tEdge prev: " << edge->prev;
+            // qDebug() << "\tEdge pair: " << edge->pair;
+            // qDebug() << "";
             edge = edge->next;
             if (edge == face_ptr->edge)
                 break;
@@ -163,7 +164,6 @@ void ViewerWidget::debugObject()
         qDebug() << "---------------------";
     }
 }
-
 void ViewerWidget::loadObject(QVector<QVector3D> vertices, QVector<QVector<unsigned int>> polygons)
 {
     object.clear();
@@ -224,14 +224,12 @@ void ViewerWidget::loadObject(QVector<QVector3D> vertices, QVector<QVector<unsig
         face_ptr->edge->prev = prev_edge;
     }
 
-    translateObject(QVector3D(-0.5, -0.5, -0.5));
+    translateObject(QVector3D(-25, -25, -25));
+    drawObject();
 }
-
 void ViewerWidget::translateObject(QVector3D offset)
 {
-    debugObject();
     object.translate(offset);
-    debugObject();
 }
 
 //// DRAWING ////
@@ -471,38 +469,44 @@ void ViewerWidget::Bresenhamm_y(QPoint start, QPoint end, QColor color, double m
 }
 
 // Draw polygon functions
-void ViewerWidget::drawPolygon(QVector<QPoint> points, QColor color, int algType)
+void ViewerWidget::drawPolygon(std::list<QPoint> polygon, QColor color, int algType)
 {
-    if (!isPolygonInside(points))
+    if (!isPolygonInside(polygon))
         return;
 
-    if (points.size() < 2)
+    if (polygon.size() < 2)
         return;
 
-    if (points.size() == 2)
+    if (polygon.size() == 2)
     {
-        QPoint start = points[0], end = points[1];
-        clipLine(points[0], points[1], start, end);
+        QPoint start, end;
+        clipLine(polygon.front(), polygon.back(), start, end);
         drawLine(start, end, color, algType);
         return;
     }
-    QVector<QPoint> clippedPolygon = clipPolygon(points);
+    clipPolygon(polygon);
 
-    if (clippedPolygon.size() < 1)
+    if (polygon.size() < 1)
         return;
 
-    for (int i = 0; i < clippedPolygon.size() - 1; i++)
+    for (std::list<QPoint>::iterator it = polygon.begin(); it != --polygon.end();)
     {
-        drawLine(clippedPolygon[i], clippedPolygon[i + 1], color, algType);
+        drawLine(*it, *(++it), color, algType);
     }
+    drawLine(polygon.back(), polygon.front(), color, algType);
 }
-void ViewerWidget::fillPolygon(QVector<QPoint> points, QColor color)
+void ViewerWidget::fillPolygon(std::list<QPoint> polygon, QColor color)
 {
-    if (points.size() < 4)
+    if (polygon.size() < 4)
         return;
-    if (points.size() == 4)
+    if (polygon.size() == 4)
     {
-        fillTriangle(points, color);
+        std::vector<QPoint> triangle;
+        for (std::list<QPoint>::iterator it = polygon.begin(); it != polygon.end(); it++)
+        {
+            triangle.push_back(*it);
+        }
+        fillTriangle(triangle, color);
         return;
     }
 
@@ -517,9 +521,10 @@ void ViewerWidget::fillPolygon(QVector<QPoint> points, QColor color)
 
     // Define sides
     QVector<Edge> edges;
-    for (int i = 0; i < points.size() - 1; i++)
+    for (std::list<QPoint>::iterator it = polygon.begin(); it != --polygon.end(); it++)
     {
-        QPoint start = points[i], end = points[i + 1];
+        QPoint start = *it;
+        QPoint end = *(++it);
 
         // Remove horizontal lines
         if (start.y() == end.y())
@@ -625,14 +630,14 @@ void ViewerWidget::fillPolygon(QVector<QPoint> points, QColor color)
         y++;
     }
 }
-void ViewerWidget::fillTriangle(QVector<QPoint> points, QColor color)
+void ViewerWidget::fillTriangle(std::vector<QPoint> polygon, QColor color)
 {
-    if (points.size() != 4)
-        throw std::runtime_error("fillTriangle called with points.size() != 4");
+    if (polygon.size() != 4)
+        throw std::runtime_error("fillTriangle called with polygon.size() != 4");
 
-    points.pop_back();
+    polygon.pop_back();
 
-    std::sort(points.begin(), points.end(), [](QPoint a, QPoint b)
+    std::sort(polygon.begin(), polygon.end(), [](QPoint a, QPoint b)
               { 
         if (a.y() == b.y())
             return a.x() < b.x();
@@ -647,44 +652,44 @@ void ViewerWidget::fillTriangle(QVector<QPoint> points, QColor color)
     Edge e1;
     Edge e2;
 
-    if (points[0].y() == points[1].y())
+    if (polygon[0].y() == polygon[1].y())
     {
         // Filling the bottom flat triangle
-        e1.start = points[0];
-        e1.end = points[2];
-        e1.w = (double)(points[2].x() - points[0].x()) / (double)(points[2].y() - points[0].y());
+        e1.start = polygon[0];
+        e1.end = polygon[2];
+        e1.w = (double)(polygon[2].x() - polygon[0].x()) / (double)(polygon[2].y() - polygon[0].y());
 
-        e2.start = points[1];
-        e2.end = points[2];
-        e2.w = (double)(points[2].x() - points[1].x()) / (double)(points[2].y() - points[1].y());
+        e2.start = polygon[1];
+        e2.end = polygon[2];
+        e2.w = (double)(polygon[2].x() - polygon[1].x()) / (double)(polygon[2].y() - polygon[1].y());
     }
-    else if (points[1].y() == points[2].y())
+    else if (polygon[1].y() == polygon[2].y())
     {
         // Filling the top flat triangle
         // Filling the bottom flat triangle
-        e1.start = points[0];
-        e1.end = points[1];
-        e1.w = (double)(points[1].x() - points[0].x()) / (double)(points[1].y() - points[0].y());
+        e1.start = polygon[0];
+        e1.end = polygon[1];
+        e1.w = (double)(polygon[1].x() - polygon[0].x()) / (double)(polygon[1].y() - polygon[0].y());
 
-        e2.start = points[0];
-        e2.end = points[2];
-        e2.w = (double)(points[2].x() - points[0].x()) / (double)(points[2].y() - points[0].y());
+        e2.start = polygon[0];
+        e2.end = polygon[2];
+        e2.w = (double)(polygon[2].x() - polygon[0].x()) / (double)(polygon[2].y() - polygon[0].y());
     }
     else
     {
         // Splitting the triangle into two
-        double m = (double)(points[2].y() - points[0].y()) / (double)(points[2].x() - points[0].x());
-        QPoint p((double)(points[1].y() - points[0].y()) / m + points[0].x(), points[1].y());
+        double m = (double)(polygon[2].y() - polygon[0].y()) / (double)(polygon[2].x() - polygon[0].x());
+        QPoint p((double)(polygon[1].y() - polygon[0].y()) / m + polygon[0].x(), polygon[1].y());
 
-        if (points[1].x() < p.x())
+        if (polygon[1].x() < p.x())
         {
-            fillTriangle({points[0], points[1], p, points[0]}, color);
-            fillTriangle({points[1], p, points[2], points[1]}, color);
+            fillTriangle({polygon[0], polygon[1], p, polygon[0]}, color);
+            fillTriangle({polygon[1], p, polygon[2], polygon[1]}, color);
         }
         else
         {
-            fillTriangle({points[0], p, points[1], points[0]}, color);
-            fillTriangle({p, points[1], points[2], p}, color);
+            fillTriangle({polygon[0], p, polygon[1], polygon[0]}, color);
+            fillTriangle({p, polygon[1], polygon[2], p}, color);
         }
         return;
     }
@@ -703,39 +708,26 @@ void ViewerWidget::fillTriangle(QVector<QPoint> points, QColor color)
 }
 
 // 3D Object
-void ViewerWidget::drawObject(ThreeDObject object)
+void ViewerWidget::drawObject(ThreeDObject obj, Camera camera)
 {
-    for (auto face : object.faces)
-    {
-        QVector<QPoint> polygon;
-
-        for (Edge *edge; edge == face.edge; edge = edge->next)
-        {
-            polygon.push_back(QPoint(edge->origin->x, edge->origin->y));
-        }
-
-        drawPolygon(polygon);
-    }
-}
-void ViewerWidget::drawObject(ThreeDObject object, QVector3D camera_position, double zenit, double azimuth, double center_of_projection)
-{
-    transformToViewingCoordinates(object, camera_position, zenit, azimuth);
-    if (center_of_projection == 0)
-        transformToOrtograpicCoordinates(object);
+    if (obj.vertices.size() == 0)
+        return;
+    transformToViewingCoordinates(obj, camera);
+    if (camera.center_of_projection == 0)
+        transformToOrtograpicCoordinates(obj);
     else
-        transformToPerspectiveCoordinates(object, center_of_projection);
+        transformToPerspectiveCoordinates(obj, camera.center_of_projection);
 
-    drawObject(object);
+    obj.translate(QVector3D(width() / 2, height() / 2, 0));
+
+    drawObject(&obj);
 }
-void ViewerWidget::transformToViewingCoordinates(ThreeDObject &object, QVector3D camera_position, double zenit, double azimuth)
+void ViewerWidget::transformToViewingCoordinates(ThreeDObject &object, Camera camera)
 {
-    object.translate(-camera_position);
+    object.translate(-camera.position);
 
-    zenit = zenit * M_PI / 180;
-    azimuth = azimuth * M_PI / 180;
-
-    QVector3D n(sin(zenit) * sin(azimuth), sin(zenit) * cos(azimuth), cos(zenit));
-    QVector3D u(cos(zenit) * sin(azimuth), cos(zenit) * cos(azimuth), -sin(zenit));
+    QVector3D n(sin(camera.zenit) * sin(camera.azimuth), sin(camera.zenit) * cos(camera.azimuth), cos(camera.zenit));
+    QVector3D u(cos(camera.zenit) * sin(camera.azimuth), cos(camera.zenit) * cos(camera.azimuth), -sin(camera.zenit));
     QVector3D v = QVector3D::crossProduct(n, u);
 
     for (std::list<Vertex>::iterator it = object.vertices.begin(); it != object.vertices.end(); it++)
@@ -746,11 +738,12 @@ void ViewerWidget::transformToViewingCoordinates(ThreeDObject &object, QVector3D
         it->z = QVector3D::dotProduct(vertex, n);
     }
 }
-void ViewerWidget::transformToOrtograpicCoordinates(ThreeDObject &object)
+void ViewerWidget::transformToOrtograpicCoordinates(ThreeDObject &obj)
 {
-    for (std::list<Vertex>::iterator it = object.vertices.begin(); it != object.vertices.end(); it++)
+    for (std::list<Vertex>::iterator it = obj.vertices.begin(); it != obj.vertices.end(); it++)
     {
         it->z = 0;
+        qDebug() << "Vertex transformed to ortographic coordinates: " << it->x << " " << it->y << " " << it->z << "\n";
     }
 }
 void ViewerWidget::transformToPerspectiveCoordinates(ThreeDObject &object, double center_of_projection)
@@ -759,6 +752,24 @@ void ViewerWidget::transformToPerspectiveCoordinates(ThreeDObject &object, doubl
     {
         it->x = it->x * center_of_projection / (center_of_projection - it->z);
         it->y = it->y * center_of_projection / (center_of_projection - it->z);
+    }
+}
+void ViewerWidget::drawObject(ThreeDObject *object)
+{
+
+    for (Face face : object->faces)
+    {
+        std::list<QPoint> polygon;
+        Edge *e = face.edge;
+        polygon.push_back(QPoint(e->origin->x, e->origin->y));
+        for (e = e->next; e != face.edge; e = e->next)
+        {
+            polygon.push_back(QPoint(e->origin->x, e->origin->y));
+        }
+        qDebug() << "Polygon:\n";
+        for (QPoint p : polygon)
+            qDebug() << "\tPoint: " << p.x() << " " << p.y() << "\n";
+        drawPolygon(polygon);
     }
 }
 
@@ -823,71 +834,72 @@ void ViewerWidget::clipLine(QPoint start, QPoint end, QPoint &clip_start, QPoint
 }
 
 // Sutherland-Hodgman
-QVector<QPoint> ViewerWidget::clipPolygonLeftSide(QVector<QPoint> polygon, int x_min)
+void ViewerWidget::clipPolygonLeftSide(std::list<QPoint> &polygon, int x_min)
 {
-    if (polygon.size() == 0)
-        return polygon;
-    polygon.removeLast();
-    QVector<QPoint> result;
-    QPoint S = polygon[polygon.size() - 1];
 
-    for (int i = 0; i < polygon.size(); i++)
+    if (polygon.size() == 0)
+        return;
+
+    std::list<QPoint> result;
+
+    QPoint S = polygon.back();
+
+    for (QPoint P : polygon)
     {
-        if (polygon[i].x() >= x_min)
+        if (P.x() >= x_min)
         {
             if (S.x() >= x_min)
             {
-                result.push_back(polygon[i]);
+                result.push_back(P);
             }
             else
             {
-                QPoint P = QPoint(x_min,
-                                  S.y() + (x_min - S.x()) * (polygon[i].y() - S.y()) / (polygon[i].x() - S.x()));
+                QPoint n_P = QPoint(x_min,
+                                    S.y() + (x_min - S.x()) * (P.y() - S.y()) / (P.x() - S.x()));
+                result.push_back(n_P);
                 result.push_back(P);
-                result.push_back(polygon[i]);
             }
         }
         else
         {
             if (S.x() >= x_min)
             {
-                QPoint P = QPoint(x_min,
-                                  S.y() + (x_min - S.x()) * (polygon[i].y() - S.y()) / (polygon[i].x() - S.x()));
-                result.push_back(P);
+                QPoint n_P = QPoint(x_min,
+                                    S.y() + (x_min - S.x()) * (P.y() - S.y()) / (P.x() - S.x()));
+                result.push_back(n_P);
             }
         }
-        S = polygon[i];
+        S = P;
     }
-    result.push_back(result[0]);
-    return result;
+    polygon = result;
+    return;
 }
-QVector<QPoint> ViewerWidget::clipPolygon(QVector<QPoint> polygon)
+void ViewerWidget::clipPolygon(std::list<QPoint> &polygon)
 {
     if (!isPolygonInside(polygon))
-        return QVector<QPoint>();
+    {
+        polygon.clear();
+        return;
+    }
 
-    QVector<QPoint> E = {QPoint(10, 10), QPoint(width() - 10, 10), QPoint(width() - 10, height() - 10), QPoint(10, height() - 10)};
-
-    QVector<QPoint> result = polygon;
+    std::vector<QPoint> E = {QPoint(10, 10), QPoint(width() - 10, 10), QPoint(width() - 10, height() - 10), QPoint(10, height() - 10)};
 
     for (int i = 0; i < 4; i++)
     {
-        if (result.size() == 0)
-            return QVector<QPoint>();
+        if (polygon.size() == 0)
+            return;
 
-        result = clipPolygonLeftSide(result, E[i].x());
+        clipPolygonLeftSide(polygon, E[i].x());
 
-        for (int i = 0; i < result.size(); i++)
+        for (std::list<QPoint>::iterator it = polygon.begin(); it != polygon.end(); it++)
         {
-            result[i] = QPoint(result[i].y(), -result[i].x());
+            *it = QPoint(it->y(), -it->x());
         }
         for (int i = 0; i < E.size(); i++)
         {
             E[i] = QPoint(E[i].y(), -E[i].x());
         }
     }
-
-    return clipPolygonLeftSide(result, E[0].x());
 }
 
 void ViewerWidget::delete_objects()

@@ -36,6 +36,14 @@ private:
 
 	// 3D Object functions
 	int loadObject(QString filename);
+	void drawObject() { vW->drawObject(); }
+	void setCamera()
+	{
+		vW->setCamera(
+			QVector3D(ui->camera_x->value(), ui->camera_y->value(), ui->camera_z->value()),
+			ui->camera_zenit->value(), ui->camera_azimuth->value(),
+			ui->projection_type->currentIndex() == 0 ? 0 : ui->center_of_projection->value());
+	}
 
 	// Image functions
 	bool saveImage(QString filename);
@@ -53,4 +61,24 @@ private slots:
 		vW->clear();
 		vW->delete_objects();
 	}
+
+	// Camera slots
+	void on_camera_x_valueChanged(double arg1) { setCamera(); }
+	void on_camera_y_valueChanged(double arg1) { setCamera(); }
+	void on_camera_z_valueChanged(double arg1) { setCamera(); }
+	void on_camera_zenit_sliderMoved(int position) { setCamera(); }
+	void on_camera_azimuth_sliderMoved(int position) { setCamera(); }
+	void on_projection_type_currentIndexChanged(int index)
+	{
+		setCamera();
+		if (index == 1)
+		{
+			ui->center_of_projection->setEnabled(true);
+		}
+		else
+		{
+			ui->center_of_projection->setEnabled(false);
+		}
+	}
+	void on_center_of_projection_valueChanged(double arg1) { setCamera(); }
 };
