@@ -86,10 +86,29 @@
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_2">
         <item>
-         <widget class="QPushButton" name="pushButtonSetColor">
+         <widget class="QPushButton" name="global_color">
           <property name="text">
            <string/>
           </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="coloring_type">
+          <item>
+           <property name="text">
+            <string>WireFrame</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Vertex</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Sides</string>
+           </property>
+          </item>
          </widget>
         </item>
        </layout>
@@ -102,7 +121,7 @@
        </property>
        <layout class="QGridLayout" name="gridLayout">
         <item row="0" column="0" colspan="2">
-         <widget class="QComboBox" name="alg_type_combobox">
+         <widget class="QComboBox" name="alg_type">
           <item>
            <property name="text">
             <string>DDA</string>
@@ -158,10 +177,24 @@
          </widget>
         </item>
         <item row="0" column="1">
-         <widget class="QDoubleSpinBox" name="camera_x"/>
+         <widget class="QDoubleSpinBox" name="camera_x">
+          <property name="minimum">
+           <double>-1000.000000000000000</double>
+          </property>
+          <property name="maximum">
+           <double>1000.000000000000000</double>
+          </property>
+         </widget>
         </item>
         <item row="1" column="1">
-         <widget class="QDoubleSpinBox" name="camera_y"/>
+         <widget class="QDoubleSpinBox" name="camera_y">
+          <property name="minimum">
+           <double>-1000.000000000000000</double>
+          </property>
+          <property name="maximum">
+           <double>1000.000000000000000</double>
+          </property>
+         </widget>
         </item>
         <item row="3" column="1">
          <widget class="QSlider" name="camera_zenit">
@@ -189,7 +222,14 @@
          </widget>
         </item>
         <item row="2" column="1">
-         <widget class="QDoubleSpinBox" name="camera_z"/>
+         <widget class="QDoubleSpinBox" name="camera_z">
+          <property name="minimum">
+           <double>-1000.000000000000000</double>
+          </property>
+          <property name="maximum">
+           <double>1000.000000000000000</double>
+          </property>
+         </widget>
         </item>
         <item row="0" column="0">
          <widget class="QLabel" name="label_3">
@@ -218,7 +258,7 @@
      <item>
       <widget class="QGroupBox" name="groupBox_4">
        <property name="title">
-        <string>GroupBox</string>
+        <string>Projection type</string>
        </property>
        <layout class="QGridLayout" name="gridLayout_3">
         <item row="1" column="0">
@@ -232,6 +272,15 @@
          <widget class="QDoubleSpinBox" name="center_of_projection">
           <property name="enabled">
            <bool>false</bool>
+          </property>
+          <property name="minimum">
+           <double>1.000000000000000</double>
+          </property>
+          <property name="maximum">
+           <double>1000.000000000000000</double>
+          </property>
+          <property name="value">
+           <double>300.000000000000000</double>
           </property>
          </widget>
         </item>

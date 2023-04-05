@@ -55,12 +55,22 @@ private slots:
 	void on_actionExit_triggered();
 
 	// Tools slots
-	void on_pushButtonSetColor_clicked();
-	void on_clear_button_clicked()
+	void on_global_color_clicked();
+	void on_alg_type_currentIndexChanged(int index)
 	{
-		vW->clear();
-		vW->delete_objects();
+		vW->setRasterizationAlgorithm(index == 0 ? ViewerWidget::DDA : ViewerWidget::BRESENHAMM);
 	}
+	void on_coloring_type_currentIndexChanged(int index)
+	{
+		vW->setColoringType(
+			index == 0 ? ViewerWidget::WIREFRAME : index == 1 ? ViewerWidget::VERTEX
+															  : ViewerWidget::SIDE);
+	}
+	// void on_clear_button_clicked()
+	// {
+	// 	vW->clear();
+	// 	vW->delete_objects();
+	// }
 
 	// Camera slots
 	void on_camera_x_valueChanged(double arg1) { setCamera(); }

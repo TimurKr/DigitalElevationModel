@@ -18,7 +18,7 @@ ThreeDViewer ::ThreeDViewer(QWidget *parent)
 
 	QColor default_color = Qt::blue;
 	QString style_sheet = QString("background-color: #%1;").arg(default_color.rgba(), 0, 16);
-	ui->pushButtonSetColor->setStyleSheet(style_sheet);
+	ui->global_color->setStyleSheet(style_sheet);
 }
 
 // Event filters
@@ -74,6 +74,8 @@ void ThreeDViewer ::ViewerWidgetMouseButtonPress(ViewerWidget *w, QEvent *event)
 
 	if (e->button() == Qt::LeftButton)
 	{
+		vW->setIsCameraRotating(true);
+		vW->setLastMousePos(QPoint(e->x(), e->y()));
 	}
 }
 void ThreeDViewer ::ViewerWidgetMouseButtonRelease(ViewerWidget *w, QEvent *event)
@@ -82,11 +84,17 @@ void ThreeDViewer ::ViewerWidgetMouseButtonRelease(ViewerWidget *w, QEvent *even
 
 	if (e->button() == Qt::LeftButton)
 	{
+		vW->setIsCameraRotating(false);
 	}
 }
 void ThreeDViewer ::ViewerWidgetMouseMove(ViewerWidget *w, QEvent *event)
 {
 	QMouseEvent *e = static_cast<QMouseEvent *>(event);
+
+	if (vW->getIsCameraRotating())
+	{
+		vW->rotateCamera(QPoint(e->x(), e->y()));
+	}
 }
 void ThreeDViewer ::ViewerWidgetLeave(ViewerWidget *w, QEvent *event)
 {
@@ -259,13 +267,13 @@ void ThreeDViewer ::on_actionExit_triggered()
 	this->close();
 }
 
-void ThreeDViewer ::on_pushButtonSetColor_clicked()
+void ThreeDViewer ::on_global_color_clicked()
 {
 	QColor newColor = QColorDialog::getColor(vW->getGlobalColor(), this);
 	if (newColor.isValid())
 	{
 		QString style_sheet = QString("background-color: #%1;").arg(newColor.rgba(), 0, 16);
-		ui->pushButtonSetColor->setStyleSheet(style_sheet);
+		ui->global_color->setStyleSheet(style_sheet);
 		vW->setGlobalColor(newColor);
 	}
 }

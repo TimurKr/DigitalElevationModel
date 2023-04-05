@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QtWidgets>
+
 class Edge;
 
 class Vertex
@@ -7,12 +9,16 @@ class Vertex
 public:
     double x, y, z;
     std::vector<Edge *> edges;
+    QColor color;
+
+    QVector3D toVector3D() const { return QVector3D(x, y, z); }
 };
 
 class Face
 {
 public:
     Edge *edge;
+    QColor color;
 };
 
 class Edge
@@ -46,6 +52,7 @@ public:
             newVertex.x = v.x;
             newVertex.y = v.y;
             newVertex.z = v.z;
+            newVertex.color = v.color;
             vertices.push_back(newVertex);
             vertexMap[&v] = &vertices.back();
         }
@@ -55,6 +62,7 @@ public:
         for (const Face &f : other.faces)
         {
             Face newFace;
+            newFace.color = f.color;
             faces.push_back(newFace);
             faceMap[&f] = &faces.back();
         }

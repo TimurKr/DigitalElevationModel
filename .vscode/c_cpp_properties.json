@@ -12,7 +12,10 @@
         "/Users/timurkramar/Qt/6.4.1/macos/lib/QtGui.framework/Headers",
         "/Users/timurkramar/Qt/6.4.1/macos/lib/QtDesigner.framework/Headers"
       ],
-      "macFrameworkPath": ["/System/Library/Frameworks"],
+      "macFrameworkPath": [
+        "/System/Library/Frameworks",
+        "/Users/timurkramar/Qt/6.4.1/macos/lib/cmake/Qt6/**"
+      ],
       "compilerPath": "/usr/bin/clang",
       "browse": {
         "path": [
