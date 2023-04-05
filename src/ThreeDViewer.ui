@@ -155,7 +155,7 @@
            <number>1</number>
           </property>
           <property name="value">
-           <number>180</number>
+           <number>0</number>
           </property>
           <property name="orientation">
            <enum>Qt::Horizontal</enum>

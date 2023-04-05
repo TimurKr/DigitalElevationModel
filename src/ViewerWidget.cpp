@@ -127,7 +127,8 @@ bool ViewerWidget::changeSize(int width, int height)
 // }
 void ViewerWidget::setPixel(int x, int y, float z, const QColor &color)
 {
-    if (z_index[y * width() + x] < z)
+    double current_z = z_index[y * width() + x];
+    if (z_index[y * width() + x] > z)
     {
         return;
     }
@@ -139,6 +140,7 @@ void ViewerWidget::setPixel(int x, int y, float z, const QColor &color)
         data[startbyte + 1] = color.green();
         data[startbyte + 2] = color.red();
         data[startbyte + 3] = color.alpha();
+        z_index[y * width() + x] = z;
     }
 }
 
@@ -793,16 +795,36 @@ void ViewerWidget::transformToViewingCoordinates(ThreeDObject &object, Camera ca
 {
     object.translate(-camera.position);
 
-    QVector3D n(sin(camera.zenit - M_PI / 2) * sin(camera.azimuth), sin(camera.zenit - M_PI / 2) * cos(camera.azimuth), cos(camera.zenit - M_PI / 2));
-    QVector3D u(-cos(camera.zenit - M_PI / 2) * sin(camera.azimuth), -cos(camera.zenit - M_PI / 2) * cos(camera.azimuth), sin(camera.zenit - M_PI / 2));
-    QVector3D v = QVector3D::crossProduct(n, u);
+    // Rotate around Z axis based on azimuth
 
     for (std::list<Vertex>::iterator it = object.vertices.begin(); it != object.vertices.end(); it++)
     {
-        QVector3D vertex(it->x, it->y, it->z);
-        it->x = QVector3D::dotProduct(vertex, v);
-        it->y = QVector3D::dotProduct(vertex, u);
-        it->z = QVector3D::dotProduct(vertex, n);
+        double x = it->x;
+        double y = it->y;
+        it->x = x * cos(-camera.azimuth) - y * sin(-camera.azimuth);
+        it->y = x * sin(-camera.azimuth) + y * cos(-camera.azimuth);
+    }
+
+    // Rotate around Y axis based on zenit
+
+    for (std::list<Vertex>::iterator it = object.vertices.begin(); it != object.vertices.end(); it++)
+    {
+        double x = it->x;
+        double z = it->z;
+        // M_PI / 2 to convert the angle from the angle from horizon, into angle from vertical
+        it->x = x * cos(-(M_PI / 2 - camera.zenit)) - z * sin(-(M_PI / 2 - camera.zenit));
+        it->z = x * sin(-(M_PI / 2 - camera.zenit)) + z * cos(-(M_PI / 2 - camera.zenit));
+    }
+
+    // Switch axis to look from the front
+
+    for (std::list<Vertex>::iterator it = object.vertices.begin(); it != object.vertices.end(); it++)
+    {
+        double x = it->x;
+        double y = it->y;
+        double z = it->z;
+        it->x = y;
+        it->y = -x;
     }
 }
 void ViewerWidget::transformToOrtograpicCoordinates(ThreeDObject &obj)
@@ -827,7 +849,7 @@ void ViewerWidget::transformToPerspectiveCoordinates(ThreeDObject &object, doubl
 }
 void ViewerWidget::drawObject(ThreeDObject *object, ColoringType coloring)
 {
-    int color_num = 5;
+    // int color_num = 5;
     for (Face face : object->faces)
     {
         std::list<QVector3D> polygon;
@@ -838,14 +860,14 @@ void ViewerWidget::drawObject(ThreeDObject *object, ColoringType coloring)
             polygon.push_back(e->origin->toVector3D());
         }
 
-        if (coloring == WIREFRAME || color_num == 0)
+        if (coloring == WIREFRAME)
         {
             drawPolygon(polygon);
         }
         else if (coloring == SIDE)
         {
             fillPolygon(polygon, face.color);
-            color_num--;
+            // color_num--;
         }
         else if (coloring == VERTEX)
         {
@@ -996,7 +1018,7 @@ void ViewerWidget::clear()
 {
     img->fill(Qt::white);
     for (int i = 0; i < width() * height(); i++)
-        z_index[i] = std::numeric_limits<double>::max();
+        z_index[i] = -std::numeric_limits<double>::max();
     update();
 }
 
