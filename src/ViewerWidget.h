@@ -74,10 +74,11 @@ public:
     // void setPixel(int x, int y, double valR, double valG, double valB, double valA = 1.);
     void setPixel(int x, int y, float z, const QColor &color);
     void setPixel(QVector3D point, const QColor &color) { setPixel(point.x() + 0.5, point.y() + 0.5, point.z(), color); }
+    void setPixel(Vertex vertex) { setPixel(vertex.x, vertex.y, vertex.z, vertex.color); }
     bool isInside(int x, int y) { return (x >= 10 && y >= 10 && x < img->width() - 10 && y < img->height() - 10) ? true : false; }
     bool isInside(QPoint point) { return isInside(point.x(), point.y()); }
-    bool isInside(QVector3D point) { return isInside(point.x(), point.y()); }
-    bool isPolygonInside(std::list<QVector3D> polygon);
+    bool isInside(Vertex vertex) { return isInside(vertex.x, vertex.y); }
+    bool isPolygonInside(std::list<Vertex> polygon);
 
     //// 3D Object ////
     void debugObject(ThreeDObject &object);
@@ -102,21 +103,22 @@ public:
     //// Drawing ////
 
     // Line
-    void drawLine(QVector3D start, QVector3D end, QColor color);
+    void drawLine(Vertex start, Vertex end);
 
-    void Dda(QVector3D start, QVector3D end, QColor color);
-    void Dda_x(QVector3D start, QVector3D end, QColor color, double m);
-    void Dda_y(QVector3D start, QVector3D end, QColor color, double w);
+    void Dda(Vertex start, Vertex end);
+    void Dda_x(Vertex start, Vertex end, double m);
+    void Dda_y(Vertex start, Vertex end, double w);
 
-    void Bresenhamm(QVector3D start, QVector3D end, QColor color);
-    void Bresenhamm_x(QVector3D start, QVector3D end, QColor color, double m);
-    void Bresenhamm_y(QVector3D start, QVector3D end, QColor color, double m);
+    void Bresenhamm(Vertex start, Vertex end);
+    void Bresenhamm_x(Vertex start, Vertex end, double m);
+    void Bresenhamm_y(Vertex start, Vertex end, double m);
 
     // Polygon
-    void drawPolygon(std::list<QVector3D> polygon) { drawPolygon(polygon, globalColor); }
-    void drawPolygon(std::list<QVector3D> polygon, QColor color);
-    void fillPolygon(std::list<QVector3D> polygon, QColor color);
-    void fillTriangle(std::vector<QVector3D> polygon, QColor color);
+    // void drawPolygon(std::list<Vertex> polygon) { drawPolygon(polygon, globalColor); }
+    void drawPolygon(std::list<Vertex> polygon, QColor color);
+    void drawPolygon(std::list<Vertex> polygon);
+    void fillPolygon(std::list<Vertex> polygon);
+    void fillTriangle(std::vector<Vertex> polygon);
 
     // 3D Object
     void drawObject() { drawObject(object, camera, coloringType); }
@@ -129,11 +131,11 @@ public:
     //// Clipping ////
 
     // Cyrus-Beck
-    void clipLine(QVector3D start, QVector3D end, QVector3D &clip_start, QVector3D &clip_end);
+    void clipLine(Vertex start, Vertex end, Vertex &clip_start, Vertex &clip_end);
 
     // Sutherland-Hodgman
-    void clipPolygonLeftSide(std::list<QVector3D> &polygon, int x_min);
-    void clipPolygon(std::list<QVector3D> &polygon);
+    void clipPolygonLeftSide(std::list<Vertex> &polygon, int x_min);
+    void clipPolygon(std::list<Vertex> &polygon);
 
     // Get/Set functions
     uchar *getData() { return data; }

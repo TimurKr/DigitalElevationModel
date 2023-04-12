@@ -62,9 +62,9 @@ bool ViewerWidget::isEmpty()
     return false;
 }
 
-bool ViewerWidget::isPolygonInside(std::list<QVector3D> polygon)
+bool ViewerWidget::isPolygonInside(std::list<Vertex> polygon)
 {
-    for (std::list<QVector3D>::iterator i = polygon.begin(); i != polygon.end(); ++i)
+    for (std::list<Vertex>::iterator i = polygon.begin(); i != polygon.end(); ++i)
     {
         if (isInside(*i))
         {
@@ -172,7 +172,7 @@ void ViewerWidget::debugObject(ThreeDObject &object)
 }
 void ViewerWidget::loadObject(QVector<QVector3D> vertices, QVector<QVector<unsigned int>> polygons)
 {
-    std::vector<QColor> colors = {Qt::red, Qt::red, Qt::green, Qt::green, Qt::blue, Qt::blue, Qt::black, Qt::black, Qt::lightGray, Qt::lightGray, Qt::black, Qt::black};
+    std::vector<QColor> colors = {Qt::red, Qt::green, Qt::blue, Qt::yellow, Qt::magenta, Qt::cyan, Qt::darkRed, Qt::darkGreen, Qt::darkBlue, Qt::darkYellow, Qt::darkMagenta, Qt::darkCyan};
 
     object.clear();
 
@@ -234,13 +234,13 @@ void ViewerWidget::loadObject(QVector<QVector3D> vertices, QVector<QVector<unsig
         face_ptr->edge->prev = prev_edge;
     }
 
-    // Translate object to the middle of the coordinate system
+    //// Tranform the object for nicer viewing ////
     float minX = std::numeric_limits<float>::max();
     float minY = std::numeric_limits<float>::max();
     float minZ = std::numeric_limits<float>::max();
-    float maxX = std::numeric_limits<float>::min();
-    float maxY = std::numeric_limits<float>::min();
-    float maxZ = std::numeric_limits<float>::min();
+    float maxX = -std::numeric_limits<float>::max();
+    float maxY = -std::numeric_limits<float>::max();
+    float maxZ = -std::numeric_limits<float>::max();
 
     for (Vertex vertex : object.vertices)
     {
@@ -258,11 +258,17 @@ void ViewerWidget::loadObject(QVector<QVector3D> vertices, QVector<QVector<unsig
             maxZ = vertex.z;
     }
 
+    // Scale the object to fit the screen nicely
+    double scaleX = 0.5 * std::fabs(width() / (maxX - minX));
+    double scaleY = 0.5 * std::fabs(height() / (maxY - minY));
+
+    // Translate object to the middle of the coordinate system
     float x = (maxX + minX) / 2;
     float y = (maxY + minY) / 2;
     float z = (maxZ + minZ) / 2;
 
     translateObject(QVector3D(-x, -y, -z));
+    object.scale(scaleX < scaleY ? scaleX : scaleY);
     drawObject();
 }
 void ViewerWidget::translateObject(QVector3D offset)
@@ -287,9 +293,6 @@ void ViewerWidget::rotateCamera(QPoint mouse_pos)
         camera.zenit = -M_PI / 2;
 
     last_mouse_pos = mouse_pos;
-    qDebug() << "Azimuth: " << camera.azimuth;
-    qDebug() << "Zenit: " << camera.zenit;
-    qDebug() << "";
     clear();
     drawObject();
 }
@@ -297,34 +300,34 @@ void ViewerWidget::rotateCamera(QPoint mouse_pos)
 //// DRAWING ////
 
 // Draw Line functions
-void ViewerWidget::drawLine(QVector3D start, QVector3D end, QColor color)
+void ViewerWidget::drawLine(Vertex start, Vertex end)
 {
-    if (start == end)
+    if (start.toVector3D() == end.toVector3D())
         return;
     if (!isInside(start) && !isInside(end))
         return;
     if (!isInside(start) || !isInside(end))
     {
-        QVector3D tmp_start = start;
-        QVector3D tmp_end = end;
+        Vertex tmp_start = start;
+        Vertex tmp_end = end;
         clipLine(tmp_start, tmp_end, start, end);
     }
     if (rasterizationAlgorithm == RasterizationAlgorithm::DDA)
     {
-        Dda(start, end, color);
+        Dda(start, end);
     }
     else if (rasterizationAlgorithm == RasterizationAlgorithm::BRESENHAMM)
     {
-        Bresenhamm(start, end, color);
+        Bresenhamm(start, end);
     }
 
     update();
 }
 
-void ViewerWidget::Dda(QVector3D start, QVector3D end, QColor color)
+void ViewerWidget::Dda(Vertex start, Vertex end)
 {
-    float d_x = end.x() - start.x();
-    float d_y = end.y() - start.y();
+    float d_x = end.x - start.x;
+    float d_y = end.y - start.y;
     double m = DBL_MAX;
 
     if (d_x != 0)
@@ -332,60 +335,68 @@ void ViewerWidget::Dda(QVector3D start, QVector3D end, QColor color)
 
     if (-1 < m && m < 1)
     {
-        if (start.x() < end.x())
+        if (start.x < end.x)
         {
-            Dda_x(start, end, color, m);
+            Dda_x(start, end, m);
         }
         else
         {
-            Dda_x(end, start, color, m);
+            Dda_x(end, start, m);
         }
     }
     else
     {
-        if (start.y() < end.y())
+        if (start.y < end.y)
         {
-            Dda_y(start, end, color, 1 / m);
+            Dda_y(start, end, 1 / m);
         }
         else
         {
-            Dda_y(end, start, color, 1 / m);
+            Dda_y(end, start, 1 / m);
         }
     }
 }
-void ViewerWidget::Dda_x(QVector3D start, QVector3D end, QColor color, double m)
+void ViewerWidget::Dda_x(Vertex start, Vertex end, double m)
 {
 
-    setPixel(start, color);
+    setPixel(start);
 
     int x;
-    double y = start.y();
+    double y = start.y;
 
-    for (x = start.x(); x < end.x(); x++)
+    for (x = start.x; x < end.x; x++)
     {
         y += m;
-        setPixel(x, (int)(y + 0.5), start.z() + (end.z() - start.z()) * (x - start.x()) / (end.x() - start.x()), color);
+        Vertex p = start.interpolate(end, (x - start.x) / (end.x - start.x));
+        p.x = x;
+        p.y = (int)(y + 0.5);
+        setPixel(p);
     }
 }
-void ViewerWidget::Dda_y(QVector3D start, QVector3D end, QColor color, double w)
+void ViewerWidget::Dda_y(Vertex start, Vertex end, double w)
 {
 
-    setPixel(start, color);
+    setPixel(start);
 
     int y;
-    double x = start.x();
+    double x = start.x;
 
-    for (y = start.y(); y < end.y(); y++)
+    for (y = start.y; y < end.y; y++)
     {
         x += w;
-        setPixel((int)(x + 0.5), y, start.z() + (end.z() - start.z()) * (y - start.y()) / (end.y() - start.y()), color);
+        double t = (y - start.y) / (end.y - start.y);
+        Vertex p = start.interpolate(end, (y - start.y) / (end.y - start.y));
+        p.x = (int)(x + 0.5);
+        p.y = y;
+        setPixel(p);
+        // setPixel((int)(x + 0.5), y, start.z() + (end.z() - start.z()) * (y - start.y()) / (end.y() - start.y()), color);
     }
 }
 
-void ViewerWidget::Bresenhamm(QVector3D start, QVector3D end, QColor color)
+void ViewerWidget::Bresenhamm(Vertex start, Vertex end)
 {
-    float d_x = end.x() - start.x();
-    float d_y = end.y() - start.y();
+    float d_x = end.x - start.x;
+    float d_y = end.y - start.y;
     double m = DBL_MAX;
 
     if (d_x != 0)
@@ -393,41 +404,41 @@ void ViewerWidget::Bresenhamm(QVector3D start, QVector3D end, QColor color)
 
     if (-1 < m && m < 1)
     {
-        if (start.x() < end.x())
+        if (start.x < end.x)
         {
-            Bresenhamm_x(start, end, color, m);
+            Bresenhamm_x(start, end, m);
         }
         else
         {
-            Bresenhamm_x(end, start, color, m);
+            Bresenhamm_x(end, start, m);
         }
     }
     else
     {
-        if (start.y() < end.y())
+        if (start.y < end.y)
         {
-            Bresenhamm_y(start, end, color, m);
+            Bresenhamm_y(start, end, m);
         }
         else
         {
-            Bresenhamm_y(end, start, color, m);
+            Bresenhamm_y(end, start, m);
         }
     }
 }
-void ViewerWidget::Bresenhamm_x(QVector3D start, QVector3D end, QColor color, double m)
+void ViewerWidget::Bresenhamm_x(Vertex start, Vertex end, double m)
 {
     if (m > 0)
     {
-        int k1 = 2 * (end.y() - start.y());
-        int k2 = k1 - 2 * (end.x() - start.x());
-        int p = k1 - (end.x() - start.x());
+        int k1 = 2 * (end.y - start.y);
+        int k2 = k1 - 2 * (end.x - start.x);
+        int p = k1 - (end.x - start.x);
 
-        int x = start.x() + 0.5;
-        int y = start.y() + 0.5;
+        int x = start.x + 0.5;
+        int y = start.y + 0.5;
 
-        setPixel(start, color);
+        setPixel(start);
 
-        for (; x < end.x(); x++)
+        for (; x < end.x; x++)
         {
             if (p > 0)
             {
@@ -438,23 +449,26 @@ void ViewerWidget::Bresenhamm_x(QVector3D start, QVector3D end, QColor color, do
             {
                 p += k1;
             }
-            setPixel(x, y, start.z() + (end.z() - start.z()) * (x - start.x()) / (end.x() - start.x()), color);
+            Vertex p = start.interpolate(end, (x - start.x) / (end.x - start.x));
+            p.x = x;
+            p.y = y;
+            setPixel(p);
         }
     }
     else
     {
-        int k1 = 2 * (end.y() - start.y());
-        int k2 = k1 + 2 * (end.x() - start.x());
-        int p = k1 + (end.x() - start.x());
+        int k1 = 2 * (end.y - start.y);
+        int k2 = k1 + 2 * (end.x - start.x);
+        int p = k1 + (end.x - start.x);
 
-        int x = start.x() + 0.5;
+        int x = start.x + 0.5;
         ;
-        int y = start.y() + 0.5;
+        int y = start.y + 0.5;
         ;
 
-        setPixel(start, color);
+        setPixel(start);
 
-        for (; x < end.x(); x++)
+        for (; x < end.x; x++)
         {
             if (p < 0)
             {
@@ -465,26 +479,29 @@ void ViewerWidget::Bresenhamm_x(QVector3D start, QVector3D end, QColor color, do
             {
                 p += k1;
             }
-            setPixel(x, y, start.z() + (end.z() - start.z()) * (x - start.x()) / (end.x() - start.x()), color);
+            Vertex p = start.interpolate(end, (x - start.x) / (end.x - start.x));
+            p.x = x;
+            p.y = y;
+            setPixel(p);
         }
     }
 }
-void ViewerWidget::Bresenhamm_y(QVector3D start, QVector3D end, QColor color, double m)
+void ViewerWidget::Bresenhamm_y(Vertex start, Vertex end, double m)
 {
     if (m > 0)
     {
-        int k1 = 2 * (end.x() - start.x());
-        int k2 = k1 - 2 * (end.y() - start.y());
-        int p = k1 - (end.y() - start.y());
+        int k1 = 2 * (end.x - start.x);
+        int k2 = k1 - 2 * (end.y - start.y);
+        int p = k1 - (end.y - start.y);
 
-        int x = start.x() + 0.5;
+        int x = start.x + 0.5;
         ;
-        int y = start.y() + 0.5;
+        int y = start.y + 0.5;
         ;
 
-        setPixel(start, color);
+        setPixel(start);
 
-        for (; y < end.y(); y++)
+        for (; y < end.y; y++)
         {
             if (p > 0)
             {
@@ -495,23 +512,26 @@ void ViewerWidget::Bresenhamm_y(QVector3D start, QVector3D end, QColor color, do
             {
                 p += k1;
             }
-            setPixel(x, y, start.z() + (end.z() - start.z()) * (y - start.y()) / (end.y() - start.y()), color);
+            Vertex p = start.interpolate(end, (y - start.y) / (end.y - start.y));
+            p.x = x;
+            p.y = y;
+            setPixel(p);
         }
     }
     else
     {
-        int k1 = 2 * (end.x() - start.x());
-        int k2 = k1 + 2 * (end.y() - start.y());
-        int p = k1 + (end.y() - start.y());
+        int k1 = 2 * (end.x - start.x);
+        int k2 = k1 + 2 * (end.y - start.y);
+        int p = k1 + (end.y - start.y);
 
-        int x = start.x() + 0.5;
+        int x = start.x + 0.5;
         ;
-        int y = start.y() + 0.5;
+        int y = start.y + 0.5;
         ;
 
-        setPixel(start, color);
+        setPixel(start);
 
-        for (; y < end.y(); y++)
+        for (; y < end.y; y++)
         {
             if (p < 0)
             {
@@ -522,13 +542,24 @@ void ViewerWidget::Bresenhamm_y(QVector3D start, QVector3D end, QColor color, do
             {
                 p += k1;
             }
-            setPixel(x, y, start.z() + (end.z() - start.z()) * (y - start.y()) / (end.y() - start.y()), color);
+            Vertex p = start.interpolate(end, (y - start.y) / (end.y - start.y));
+            p.x = x;
+            p.y = y;
+            setPixel(p);
         }
     }
 }
 
 // Draw polygon functions
-void ViewerWidget::drawPolygon(std::list<QVector3D> polygon, QColor color)
+void ViewerWidget::drawPolygon(std::list<Vertex> polygon, QColor color)
+{
+    for (Vertex &vertex : polygon)
+    {
+        vertex.color = color;
+    }
+    drawPolygon(polygon);
+}
+void ViewerWidget::drawPolygon(std::list<Vertex> polygon)
 {
     if (!isPolygonInside(polygon))
         return;
@@ -538,9 +569,9 @@ void ViewerWidget::drawPolygon(std::list<QVector3D> polygon, QColor color)
 
     if (polygon.size() == 2)
     {
-        QVector3D start, end;
+        Vertex start, end;
         clipLine(polygon.front(), polygon.back(), start, end);
-        drawLine(start, end, color);
+        drawLine(start, end);
         return;
     }
     clipPolygon(polygon);
@@ -548,82 +579,81 @@ void ViewerWidget::drawPolygon(std::list<QVector3D> polygon, QColor color)
     if (polygon.size() < 1)
         return;
 
-    for (std::list<QVector3D>::iterator it = polygon.begin(); it != --polygon.end();)
+    for (std::list<Vertex>::iterator it = polygon.begin(); it != --polygon.end();)
     {
-        drawLine(*it, *(++it), color);
+        drawLine(*it, *(++it));
     }
-    drawLine(polygon.back(), polygon.front(), color);
+    drawLine(polygon.back(), polygon.front());
 }
-void ViewerWidget::fillPolygon(std::list<QVector3D> polygon, QColor color)
+void ViewerWidget::fillPolygon(std::list<Vertex> polygon)
 {
     if (polygon.size() < 3)
         return;
     if (polygon.size() == 3)
     {
-        std::vector<QVector3D> triangle;
-        for (std::list<QVector3D>::iterator it = polygon.begin(); it != polygon.end(); it++)
+        std::vector<Vertex> triangle;
+        for (std::list<Vertex>::iterator it = polygon.begin(); it != polygon.end(); it++)
         {
             triangle.push_back(*it);
         }
-        fillTriangle(triangle, color);
+        fillTriangle(triangle);
         return;
     }
 
     struct Edge
     {
-        QVector3D start;
-        QVector3D end;
+        Vertex start;
+        Vertex end;
         int dy;
         double x;
         double dx;
-        double z;
-        double dz;
     };
 
     polygon.push_back(polygon.front());
 
     // Define sides
     QVector<Edge> edges;
-    for (std::list<QVector3D>::iterator it = polygon.begin(); it != --polygon.end(); it++)
+    for (std::list<Vertex>::iterator it = polygon.begin(); it != --polygon.end(); it++)
     {
-        QVector3D start = *it;
-        QVector3D end = *(++it);
+        Vertex start = *it;
+        Vertex end = *(++it);
 
         // Remove horizontal lines
-        if (start.y() == end.y())
+        if ((int)start.y + 0.5 == (int)end.y + 0.5)
             continue;
 
         // Orientate the edge
-        if (start.y() > end.y())
+        if (start.y > end.y)
         {
-            QVector3D temp = start;
+            Vertex temp = start;
             start = end;
             end = temp;
         }
 
+        Vertex new_end = end;
+        new_end.y -= 1;
+
         Edge edge;
         edge.start = start;
-        edge.end = end + QVector3D(0, -1, 0);
-        edge.dy = (int)edge.end.y() - start.y() + 0.5;
-        edge.x = start.x();
-        edge.dx = (end.x() - start.x()) / (end.y() - start.y());
-        edge.z = start.z();
-        edge.dz = (end.z() - start.z()) / (end.y() - start.y());
+        edge.end = new_end;
+        edge.dy = (int)edge.end.y - start.y + 0.5;
+        edge.x = start.x;
+        edge.dx = (end.x - start.x) / (end.y - start.y);
 
         edges.push_back(edge);
     }
 
     // Sort by y
     std::sort(edges.begin(), edges.end(), [](Edge e1, Edge e2)
-              { return e1.start.y() < e2.start.y(); });
+              { return e1.start.y < e2.start.y; });
 
-    int y_min = (int)edges[0].start.y() + 0.5;
+    int y_min = (int)edges[0].start.y + 0.5;
     int y_max = y_min;
     for (int i = 0; i < edges.size(); i++)
     {
-        if ((int)edges[i].end.y() + 0.5 > y_max)
+        if ((int)edges[i].end.y + 0.5 > y_max)
         {
-            y_max = (int)edges[i].end.y() + 0.5;
+            y_max = (int)edges[i].end.y + 0.5;
         }
     }
 
@@ -632,7 +662,7 @@ void ViewerWidget::fillPolygon(std::list<QVector3D> polygon, QColor color)
     edges_table.resize(y_max - y_min + 1);
     for (int i = 0; i < edges.size(); i++)
     {
-        edges_table[edges[i].start.y() - y_min].push_back(edges[i]);
+        edges_table[edges[i].start.y - y_min].push_back(edges[i]);
     }
 
     // Scanline, one line at a time from the top to the bottom
@@ -657,10 +687,15 @@ void ViewerWidget::fillPolygon(std::list<QVector3D> polygon, QColor color)
         {
             if (active_edges[j].x != active_edges[j + 1].x)
             {
-                drawLine(
-                    QVector3D(active_edges[j].x, y, active_edges[j].z),
-                    QVector3D(active_edges[j + 1].x, y, active_edges[j + 1].z),
-                    color);
+                Vertex start = active_edges[j].start.interpolate(active_edges[j].end, (y - active_edges[j].start.y) / (active_edges[j].end.y - active_edges[j].start.y + 1));
+                start.x = active_edges[j].x;
+                start.y = y;
+
+                Vertex end = active_edges[j + 1].start.interpolate(active_edges[j + 1].end, (y - active_edges[j + 1].start.y) / (active_edges[j + 1].end.y - active_edges[j + 1].start.y + 1));
+                end.x = active_edges[j + 1].x;
+                end.y = y;
+
+                drawLine(start, end);
             }
         }
 
@@ -677,7 +712,6 @@ void ViewerWidget::fillPolygon(std::list<QVector3D> polygon, QColor color)
             else
             {
                 active_edges[j].x += active_edges[j].dx;
-                active_edges[j].z += active_edges[j].dz;
                 active_edges[j].dy--;
             }
         }
@@ -685,94 +719,99 @@ void ViewerWidget::fillPolygon(std::list<QVector3D> polygon, QColor color)
         y++;
     }
 }
-void ViewerWidget::fillTriangle(std::vector<QVector3D> polygon, QColor color)
+void ViewerWidget::fillTriangle(std::vector<Vertex> polygon)
 {
     if (polygon.size() != 3)
         throw std::runtime_error("fillTriangle called with polygon.size() != 3");
 
     std::sort(polygon.begin(), polygon.end(),
-              [](QVector3D a, QVector3D b)
+              [](Vertex a, Vertex b)
               {
-                  if ((int)a.y() + 0.5 == (int)b.y() + 0.5)
-                      return a.x() < b.x();
-                  return a.y() < b.y();
+                  if ((int)a.y + 0.5 == (int)b.y + 0.5)
+                      return a.x < b.x;
+                  return a.y < b.y;
               });
 
     struct Edge
     {
-        QVector3D start, end;
-        double dx, dz;
+        Vertex start, end;
+        double dx;
     };
 
     Edge e1;
     Edge e2;
 
-    if ((int)polygon[0].y() + 0.5 == (int)polygon[1].y() + 0.5)
+    if ((int)(polygon[0].y + 0.5) == (int)(polygon[1].y + 0.5))
     {
         // Filling the bottom flat triangle
         e1.start = polygon[0];
         e1.end = polygon[2];
-        e1.dx = (double)(polygon[2].x() - polygon[0].x()) / (double)(polygon[2].y() - polygon[0].y());
-        e1.dz = (double)(polygon[2].z() - polygon[0].z()) / (double)(polygon[2].y() - polygon[0].y());
+        e1.dx = (double)(polygon[2].x - polygon[0].x) / (double)(polygon[2].y - polygon[0].y);
+        // e1.dz = (double)(polygon[2].z - polygon[0].z) / (double)(polygon[2].y - polygon[0].y);
 
         e2.start = polygon[1];
         e2.end = polygon[2];
-        e2.dx = (double)(polygon[2].x() - polygon[1].x()) / (double)(polygon[2].y() - polygon[1].y());
-        e2.dz = (double)(polygon[2].z() - polygon[1].z()) / (double)(polygon[2].y() - polygon[1].y());
+        e2.dx = (double)(polygon[2].x - polygon[1].x) / (double)(polygon[2].y - polygon[1].y);
+        // e2.dz = (double)(polygon[2].z - polygon[1].z) / (double)(polygon[2].y - polygon[1].y);
     }
-    else if ((int)polygon[1].y() + 0.5 == (int)polygon[2].y() + 0.5)
+    else if ((int)(polygon[1].y + 0.5) == (int)(polygon[2].y + 0.5))
     {
         // Filling the top flat triangle
         e1.start = polygon[0];
         e1.end = polygon[1];
-        e1.dx = (double)(polygon[1].x() - polygon[0].x()) / (double)(polygon[1].y() - polygon[0].y());
-        e1.dz = (double)(polygon[1].z() - polygon[0].z()) / (double)(polygon[1].y() - polygon[0].y());
+        e1.dx = (double)(polygon[1].x - polygon[0].x) / (double)(polygon[1].y - polygon[0].y);
+        // e1.dz = (double)(polygon[1].z - polygon[0].z) / (double)(polygon[1].y - polygon[0].y);
 
         e2.start = polygon[0];
         e2.end = polygon[2];
-        e2.dx = (double)(polygon[2].x() - polygon[0].x()) / (double)(polygon[2].y() - polygon[0].y());
-        e2.dz = (double)(polygon[2].z() - polygon[0].z()) / (double)(polygon[2].y() - polygon[0].y());
+        e2.dx = (double)(polygon[2].x - polygon[0].x) / (double)(polygon[2].y - polygon[0].y);
+        // e2.dz = (double)(polygon[2].z - polygon[0].z) / (double)(polygon[2].y - polygon[0].y);
     }
     else
     {
         // Splitting the triangle into two
-        double dx = (double)(polygon[2].y() - polygon[0].y()) / (double)(polygon[2].x() - polygon[0].x());
-        double dz = (double)(polygon[2].y() - polygon[0].y()) / (double)(polygon[2].z() - polygon[0].z());
-        QVector3D split_point(
-            (polygon[1].y() - polygon[0].y()) / dx + polygon[0].x(),
-            polygon[1].y(),
-            (polygon[1].y() - polygon[0].y()) / dz + polygon[0].z());
+        double dx = (double)(polygon[2].y - polygon[0].y) / (double)(polygon[2].x - polygon[0].x);
+        // double dz = (double)(polygon[2].y - polygon[0].y) / (double)(polygon[2].z - polygon[0].z);
+        Vertex split_point(polygon[0].interpolate(polygon[2], (polygon[1].y - polygon[0].y) / (polygon[2].y - polygon[0].y)));
 
-        if (polygon[1].x() < split_point.x())
+        // QVector3D split_point(
+        //     (polygon[1].y - polygon[0].y) / dx + polygon[0].x,
+        //     polygon[1].y,
+        //     (polygon[1].y - polygon[0].y) / dz + polygon[0].z);
+
+        if (polygon[1].x < split_point.x)
         {
-            fillTriangle({polygon[0], polygon[1], split_point}, color);
-            fillTriangle({polygon[1], split_point, polygon[2]}, color);
+            fillTriangle({polygon[0], polygon[1], split_point});
+            fillTriangle({polygon[1], split_point, polygon[2]});
         }
         else
         {
-            fillTriangle({polygon[0], split_point, polygon[1]}, color);
-            fillTriangle({split_point, polygon[1], polygon[2]}, color);
+            fillTriangle({polygon[0], split_point, polygon[1]});
+            fillTriangle({split_point, polygon[1], polygon[2]});
         }
         return;
     }
 
-    double x1 = e1.start.x();
-    double x2 = e2.start.x();
-    double z1 = e1.start.z();
-    double z2 = e2.start.z();
-    for (int y = e1.start.y(); y < e1.end.y(); y++)
+    double x1 = e1.start.x;
+    double x2 = e2.start.x;
+    // double z1 = e1.start.z;
+    // double z2 = e2.start.z;
+    for (int y = e1.start.y + 0.5; y < e1.end.y; y++)
     {
         if (x1 != x2)
         {
             drawLine(
-                QVector3D(x1, y, z1),
-                QVector3D(x2, y, z2),
-                color);
+                e1.start.interpolate(e1.end, (y - e1.start.y) / (e1.end.y - e1.start.y)),
+                e2.start.interpolate(e2.end, (y - e2.start.y) / (e2.end.y - e2.start.y)));
+            // drawLine(
+            //     QVector3D(x1, y, z1),
+            //     QVector3D(x2, y, z2),
+            //     color);
         }
         x1 += e1.dx;
         x2 += e2.dx;
-        z1 += e1.dz;
-        z2 += e2.dz;
+        // z1 += e1.dz;
+        // z2 += e2.dz;
     }
 }
 
@@ -849,29 +888,32 @@ void ViewerWidget::transformToPerspectiveCoordinates(ThreeDObject &object, doubl
 }
 void ViewerWidget::drawObject(ThreeDObject *object, ColoringType coloring)
 {
-    // int color_num = 5;
     for (Face face : object->faces)
     {
-        std::list<QVector3D> polygon;
+        std::list<Vertex> polygon;
         Edge *e = face.edge;
-        polygon.push_back(e->origin->toVector3D());
+
+        polygon.push_back(e->origin->copy());
         for (e = e->next; e != face.edge; e = e->next)
         {
-            polygon.push_back(e->origin->toVector3D());
+            polygon.push_back(e->origin->copy());
+        }
+
+        for (Vertex &v : polygon)
+        {
+            if (coloring == WIREFRAME)
+                v.color = globalColor;
+            else if (coloring == SIDE)
+                v.color = face.color;
         }
 
         if (coloring == WIREFRAME)
         {
             drawPolygon(polygon);
         }
-        else if (coloring == SIDE)
+        else if (coloring == SIDE || coloring == VERTEX)
         {
-            fillPolygon(polygon, face.color);
-            // color_num--;
-        }
-        else if (coloring == VERTEX)
-        {
-            qDebug() << "Vertex coloring\n";
+            fillPolygon(polygon);
         }
     }
 }
@@ -879,12 +921,12 @@ void ViewerWidget::drawObject(ThreeDObject *object, ColoringType coloring)
 //// Clipping ////
 
 // Cyrus-Beck
-void ViewerWidget::clipLine(QVector3D start, QVector3D end, QVector3D &clip_start, QVector3D &clip_end)
+void ViewerWidget::clipLine(Vertex start, Vertex end, Vertex &clip_start, Vertex &clip_end)
 {
     if (!isInside(start) && !isInside(end))
     {
-        clip_start = QVector3D();
-        clip_end = QVector3D();
+        clip_start = Vertex();
+        clip_end = Vertex();
         return;
     }
     if (isInside(start) && isInside(end))
@@ -895,7 +937,7 @@ void ViewerWidget::clipLine(QVector3D start, QVector3D end, QVector3D &clip_star
     }
 
     double tl = 0, tu = 1;
-    QVector3D d = end - start;
+    QVector3D d = end.toVector3D() - start.toVector3D();
 
     QVector<QPoint> E = {QPoint(10, 10), QPoint(10, height() - 10), QPoint(width() - 10, height() - 10), QPoint(width() - 10, 10)};
 
@@ -929,50 +971,57 @@ void ViewerWidget::clipLine(QVector3D start, QVector3D end, QVector3D &clip_star
     }
     else if (tl < tu)
     {
-        clip_start = start + d * tl;
-        clip_end = start + d * tu;
+        clip_start = start.interpolate(end, tl);
+        clip_end = start.interpolate(end, tu);
+        // clip_start = start + d * tl;
+        // clip_end = start + d * tu;
     }
     // printf("clip_start: %d %d", clip_start.x(), clip_start.y());
     // printf("clip_end: %d %d", clip_end.x(), clip_end.y());
 }
 
 // Sutherland-Hodgman
-void ViewerWidget::clipPolygonLeftSide(std::list<QVector3D> &polygon, int x_min)
+void ViewerWidget::clipPolygonLeftSide(std::list<Vertex> &polygon, int x_min)
 {
 
     if (polygon.size() == 0)
         return;
 
-    std::list<QVector3D> result;
+    std::list<Vertex> result;
 
-    QVector3D last_vertex = polygon.back();
+    Vertex last_vertex = polygon.back();
 
-    for (QVector3D vertex : polygon)
+    for (Vertex vertex : polygon)
     {
-        if (vertex.x() >= x_min)
+        if (vertex.x >= x_min)
         {
-            if (last_vertex.x() >= x_min)
+            if (last_vertex.x >= x_min)
             {
                 result.push_back(vertex);
             }
             else
             {
-                QVector3D new_vertex(
-                    x_min,
-                    last_vertex.y() + (x_min - last_vertex.x()) * (vertex.y() - last_vertex.y()) / (vertex.x() - last_vertex.x()),
-                    last_vertex.z() + (x_min - last_vertex.x()) * (vertex.z() - last_vertex.z()) / (vertex.x() - last_vertex.x()));
+                Vertex new_vertex = last_vertex.interpolate(vertex, (x_min - last_vertex.x) / (vertex.x - last_vertex.x));
+                new_vertex.x = x_min;
+                // QVector3D new_vertex(
+                //     x_min,
+                //     last_vertex.y + (x_min - last_vertex.x) * (vertex.y - last_vertex.y) / (vertex.x - last_vertex.x),
+                //     last_vertex.z + (x_min - last_vertex.x) * (vertex.z - last_vertex.z) / (vertex.x - last_vertex.x));
                 result.push_back(new_vertex);
                 result.push_back(vertex);
             }
         }
         else
         {
-            if (last_vertex.x() >= x_min)
+            if (last_vertex.x >= x_min)
             {
-                QVector3D new_vertex(
-                    x_min,
-                    last_vertex.y() + (x_min - last_vertex.x()) * (vertex.y() - last_vertex.y()) / (vertex.x() - last_vertex.x()),
-                    last_vertex.z() + (x_min - last_vertex.x()) * (vertex.z() - last_vertex.z()) / (vertex.x() - last_vertex.x()));
+                Vertex new_vertex = last_vertex.interpolate(vertex, (x_min - last_vertex.x) / (vertex.x - last_vertex.x));
+                new_vertex.x = x_min;
+
+                // QVector3D new_vertex(
+                //     x_min,
+                //     last_vertex.y + (x_min - last_vertex.x) * (vertex.y - last_vertex.y) / (vertex.x - last_vertex.x),
+                //     last_vertex.z + (x_min - last_vertex.x) * (vertex.z - last_vertex.z) / (vertex.x - last_vertex.x));
                 result.push_back(new_vertex);
             }
         }
@@ -981,7 +1030,7 @@ void ViewerWidget::clipPolygonLeftSide(std::list<QVector3D> &polygon, int x_min)
     polygon = result;
     return;
 }
-void ViewerWidget::clipPolygon(std::list<QVector3D> &polygon)
+void ViewerWidget::clipPolygon(std::list<Vertex> &polygon)
 {
     if (!isPolygonInside(polygon))
     {
@@ -998,9 +1047,12 @@ void ViewerWidget::clipPolygon(std::list<QVector3D> &polygon)
 
         clipPolygonLeftSide(polygon, E[i].x());
 
-        for (std::list<QVector3D>::iterator it = polygon.begin(); it != polygon.end(); it++)
+        for (std::list<Vertex>::iterator it = polygon.begin(); it != polygon.end(); it++)
         {
-            *it = QVector3D(it->y(), -it->x(), it->z());
+            // *it = Vertex(it->y, -it->x, it->z);
+            double tmp = it->x;
+            it->x = it->y;
+            it->y = -tmp;
         }
         for (int i = 0; i < E.size(); i++)
         {

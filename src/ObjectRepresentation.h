@@ -12,6 +12,31 @@ public:
     QColor color;
 
     QVector3D toVector3D() const { return QVector3D(x, y, z); }
+    QPoint toPoint() const { return QPoint((int)x + 0.5, (int)y + 0.5); }
+
+    Vertex copy() const
+    {
+        Vertex result;
+        result.x = x;
+        result.y = y;
+        result.z = z;
+        result.color = color;
+        return result;
+    }
+
+    Vertex interpolate(Vertex &other, double t)
+    {
+        Vertex result;
+        result.x = x + (other.x - x) * t;
+        result.y = y + (other.y - y) * t;
+        result.z = z + (other.z - z) * t;
+        result.color =
+            QColor(
+                color.red() + (other.color.red() - color.red()) * t,
+                color.green() + (other.color.green() - color.green()) * t,
+                color.blue() + (other.color.blue() - color.blue()) * t);
+        return result;
+    }
 };
 
 class Face
@@ -114,6 +139,15 @@ public:
             v.x += offset.x();
             v.y += offset.y();
             v.z += offset.z();
+        }
+    }
+    void scale(double factor)
+    {
+        for (auto &v : vertices)
+        {
+            v.x *= factor;
+            v.y *= factor;
+            v.z *= factor;
         }
     }
 };
