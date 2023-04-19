@@ -144,6 +144,14 @@ void ViewerWidget::setPixel(int x, int y, float z, const QColor &color)
     }
 }
 
+void ViewerWidget::setGlobalColor(QColor color)
+{
+    globalColor = color;
+    object.recolor(color);
+    clear();
+    drawObject();
+}
+
 //// OBJECT ////
 
 void ViewerWidget::debugObject(ThreeDObject &object)
@@ -172,8 +180,6 @@ void ViewerWidget::debugObject(ThreeDObject &object)
 }
 void ViewerWidget::loadObject(QVector<QVector3D> vertices, QVector<QVector<unsigned int>> polygons)
 {
-    std::vector<QColor> colors = {Qt::red, Qt::green, Qt::blue, Qt::yellow, Qt::magenta, Qt::cyan, Qt::darkRed, Qt::darkGreen, Qt::darkBlue, Qt::darkYellow, Qt::darkMagenta, Qt::darkCyan};
-
     object.clear();
 
     // Load vertices
@@ -183,7 +189,7 @@ void ViewerWidget::loadObject(QVector<QVector3D> vertices, QVector<QVector<unsig
         vertex.x = vertices[i].x();
         vertex.y = vertices[i].y();
         vertex.z = vertices[i].z();
-        vertex.color = colors[i % colors.size()];
+        vertex.color = globalColor;
         object.vertices.push_back(vertex);
     }
 
@@ -192,7 +198,7 @@ void ViewerWidget::loadObject(QVector<QVector3D> vertices, QVector<QVector<unsig
     {
         object.faces.push_back(Face());
         Face *face_ptr = &object.faces.back();
-        face_ptr->color = colors[i % colors.size()];
+        face_ptr->color = globalColor;
 
         Edge *prev_edge = nullptr;
         for (int j = 0; j < polygons[i].size(); j++)
@@ -259,8 +265,8 @@ void ViewerWidget::loadObject(QVector<QVector3D> vertices, QVector<QVector<unsig
     }
 
     // Scale the object to fit the screen nicely
-    double scaleX = 0.5 * std::fabs(width() / (maxX - minX));
-    double scaleY = 0.5 * std::fabs(height() / (maxY - minY));
+    double scaleX = 0.5 * std::fabs(width() / (maxX - minX + std::numeric_limits<float>::min()));
+    double scaleY = 0.5 * std::fabs(height() / (maxY - minY + std::numeric_limits<float>::min()));
 
     // Translate object to the middle of the coordinate system
     float x = (maxX + minX) / 2;
@@ -278,7 +284,7 @@ void ViewerWidget::translateObject(QVector3D offset)
 
 //// CAMERA ////
 
-void ViewerWidget::rotateCamera(QPoint mouse_pos)
+void ViewerWidget::rotateCamera(QPointF mouse_pos)
 {
     double dx = 0.03 * (mouse_pos.x() - last_mouse_pos.x());
     double dy = 0.03 * (mouse_pos.y() - last_mouse_pos.y());
@@ -295,6 +301,17 @@ void ViewerWidget::rotateCamera(QPoint mouse_pos)
     last_mouse_pos = mouse_pos;
     clear();
     drawObject();
+}
+
+//// LIGHTING ////
+void ViewerWidget::setLightIntensity(int intensity)
+{
+    if (intensity < 0)
+        intensity = 0;
+    if (intensity > 255)
+        intensity = 255;
+    lightSource.intensity = intensity;
+    redraw();
 }
 
 //// DRAWING ////
@@ -389,7 +406,6 @@ void ViewerWidget::Dda_y(Vertex start, Vertex end, double w)
         p.x = (int)(x + 0.5);
         p.y = y;
         setPixel(p);
-        // setPixel((int)(x + 0.5), y, start.z() + (end.z() - start.z()) * (y - start.y()) / (end.y() - start.y()), color);
     }
 }
 
@@ -746,38 +762,28 @@ void ViewerWidget::fillTriangle(std::vector<Vertex> polygon)
         // Filling the bottom flat triangle
         e1.start = polygon[0];
         e1.end = polygon[2];
-        e1.dx = (double)(polygon[2].x - polygon[0].x) / (double)(polygon[2].y - polygon[0].y);
-        // e1.dz = (double)(polygon[2].z - polygon[0].z) / (double)(polygon[2].y - polygon[0].y);
 
         e2.start = polygon[1];
         e2.end = polygon[2];
-        e2.dx = (double)(polygon[2].x - polygon[1].x) / (double)(polygon[2].y - polygon[1].y);
-        // e2.dz = (double)(polygon[2].z - polygon[1].z) / (double)(polygon[2].y - polygon[1].y);
     }
     else if ((int)(polygon[1].y + 0.5) == (int)(polygon[2].y + 0.5))
     {
         // Filling the top flat triangle
         e1.start = polygon[0];
         e1.end = polygon[1];
-        e1.dx = (double)(polygon[1].x - polygon[0].x) / (double)(polygon[1].y - polygon[0].y);
-        // e1.dz = (double)(polygon[1].z - polygon[0].z) / (double)(polygon[1].y - polygon[0].y);
 
         e2.start = polygon[0];
         e2.end = polygon[2];
-        e2.dx = (double)(polygon[2].x - polygon[0].x) / (double)(polygon[2].y - polygon[0].y);
-        // e2.dz = (double)(polygon[2].z - polygon[0].z) / (double)(polygon[2].y - polygon[0].y);
+    }
+    else if ((int)(polygon[0].y + 0.5) == (int)(polygon[2].y + 0.5))
+    {
+        // The triangle is a horizontal line, lets just skip it
+        return;
     }
     else
     {
         // Splitting the triangle into two
-        double dx = (double)(polygon[2].y - polygon[0].y) / (double)(polygon[2].x - polygon[0].x);
-        // double dz = (double)(polygon[2].y - polygon[0].y) / (double)(polygon[2].z - polygon[0].z);
         Vertex split_point(polygon[0].interpolate(polygon[2], (polygon[1].y - polygon[0].y) / (polygon[2].y - polygon[0].y)));
-
-        // QVector3D split_point(
-        //     (polygon[1].y - polygon[0].y) / dx + polygon[0].x,
-        //     polygon[1].y,
-        //     (polygon[1].y - polygon[0].y) / dz + polygon[0].z);
 
         if (polygon[1].x < split_point.x)
         {
@@ -791,6 +797,14 @@ void ViewerWidget::fillTriangle(std::vector<Vertex> polygon)
         }
         return;
     }
+
+    if (e1.start.y == e1.end.y)
+        return;
+    if (e2.start.y == e2.end.y)
+        return;
+
+    e1.dx = (double)(e1.end.x - e1.start.x) / (double)(e1.end.y - e1.start.y);
+    e2.dx = (double)(e2.end.x - e2.start.x) / (double)(e2.end.y - e2.start.y);
 
     double x1 = e1.start.x;
     double x2 = e2.start.x;
@@ -816,14 +830,15 @@ void ViewerWidget::fillTriangle(std::vector<Vertex> polygon)
 }
 
 // 3D Object
-void ViewerWidget::drawObject(ThreeDObject obj, Camera camera, ColoringType coloring)
+void ViewerWidget::drawObject(ThreeDObject obj, Camera camera, LightSource light, ColoringType coloring)
 {
     if (obj.vertices.size() == 0)
         return;
     transformToViewingCoordinates(obj, camera);
-    if (camera.center_of_projection == 0)
-        transformToOrtograpicCoordinates(obj);
-    else
+
+    calculateColors(obj, light, camera, coloring);
+
+    if (camera.center_of_projection != 0)
         transformToPerspectiveCoordinates(obj, camera.center_of_projection);
 
     obj.translate(QVector3D(width() / 2, height() / 2, 0));
@@ -866,13 +881,54 @@ void ViewerWidget::transformToViewingCoordinates(ThreeDObject &object, Camera ca
         it->y = -x;
     }
 }
-void ViewerWidget::transformToOrtograpicCoordinates(ThreeDObject &obj)
+void ViewerWidget::calculateColors(ThreeDObject &object, LightSource light, Camera camera, ColoringType coloring)
 {
-    // for (std::list<Vertex>::iterator it = obj.vertices.begin(); it != obj.vertices.end(); it++)
-    // {
-    //     // it->z = 0;
-    //     // qDebug() << "Vertex transformed to ortographic coordinates: " << it->x << " " << it->y << " " << it->z << "\n";
-    // }
+    QVector3D norm_v, ligh_v, refl_v, view_v;
+
+    if (coloring == ColoringType::SIDE)
+    {
+        for (Face &face : object.faces)
+        {
+            QVector3D center = face.center();
+            norm_v = face.normal().normalized();
+            ligh_v = (light.position - center).normalized();
+            refl_v = 2 * QVector3D::dotProduct(norm_v, ligh_v) * norm_v - ligh_v;
+            view_v = (QVector3D(0, 0, 400) - center).normalized();
+
+            QVector3D Ia, Id, Im;
+
+            // Ambient
+            Ia = QVector3D(lightModel.ambient_color.red() * lightModel.ambient.x() / 255.,
+                           lightModel.ambient_color.green() * lightModel.ambient.y() / 255.,
+                           lightModel.ambient_color.blue() * lightModel.ambient.z() / 255.);
+
+            // Diffuse
+            float diffuse = QVector3D::dotProduct(norm_v, ligh_v) * light.intensity / 100.;
+            if (diffuse > 0)
+                Id = diffuse * QVector3D(light.color.red() * lightModel.diffuse.x() / 255.,
+                                         light.color.green() * lightModel.diffuse.y() / 255.,
+                                         light.color.blue() * lightModel.diffuse.z() / 255.);
+
+            // Mirror
+            float mirror = QVector3D::dotProduct(refl_v, view_v) * light.intensity / 255.;
+            if (mirror > 0)
+            {
+                Im = pow(mirror, lightModel.specular_sharpness) *
+                     QVector3D(light.color.red() * lightModel.specular.x() / 255.,
+                               light.color.green() * lightModel.specular.y() / 255.,
+                               light.color.blue() * lightModel.specular.z() / 255.);
+            }
+
+            QVector3D final_light = Ia + Id + Im;
+            if (final_light.x() > 1)
+                final_light.setX(1);
+            if (final_light.y() > 1)
+                final_light.setY(1);
+            if (final_light.z() > 1)
+                final_light.setZ(1);
+            face.color = QColor(final_light.x() * 255, final_light.y() * 255, final_light.z() * 255);
+        }
+    }
 }
 void ViewerWidget::transformToPerspectiveCoordinates(ThreeDObject &object, double center_of_projection)
 {
@@ -1072,6 +1128,11 @@ void ViewerWidget::clear()
     for (int i = 0; i < width() * height(); i++)
         z_index[i] = -std::numeric_limits<double>::max();
     update();
+}
+void ViewerWidget::redraw()
+{
+    clear();
+    drawObject();
 }
 
 // Slots

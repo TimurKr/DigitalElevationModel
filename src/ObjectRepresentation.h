@@ -3,6 +3,7 @@
 #include <QtWidgets>
 
 class Edge;
+class Face;
 
 class Vertex
 {
@@ -39,13 +40,6 @@ public:
     }
 };
 
-class Face
-{
-public:
-    Edge *edge;
-    QColor color;
-};
-
 class Edge
 {
 public:
@@ -53,6 +47,29 @@ public:
     Face *face;
     Edge *next, *prev;
     Edge *pair;
+};
+
+class Face
+{
+public:
+    Edge *edge;
+    QColor color;
+
+    QVector3D center() const
+    {
+        QVector3D v1 = edge->origin->toVector3D();
+        QVector3D v2 = edge->next->origin->toVector3D();
+        QVector3D v3 = edge->next->next->origin->toVector3D();
+        return (v1 + v2 + v3) / 3;
+    }
+
+    QVector3D normal() const
+    {
+        QVector3D v1 = edge->origin->toVector3D();
+        QVector3D v2 = edge->next->origin->toVector3D();
+        QVector3D v3 = edge->next->next->origin->toVector3D();
+        return QVector3D::crossProduct(v2 - v1, v3 - v2);
+    }
 };
 
 class ThreeDObject
@@ -148,6 +165,17 @@ public:
             v.x *= factor;
             v.y *= factor;
             v.z *= factor;
+        }
+    }
+    void recolor(QColor color)
+    {
+        for (auto &v : vertices)
+        {
+            v.color = color;
+        }
+        for (auto &f : faces)
+        {
+            f.color = color;
         }
     }
 };

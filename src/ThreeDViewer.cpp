@@ -16,9 +16,33 @@ ThreeDViewer ::ThreeDViewer(QWidget *parent)
 	vW->installEventFilter(this);
 	setCamera();
 
+	// Set global color
 	QColor default_color = Qt::blue;
 	QString style_sheet = QString("background-color: #%1;").arg(default_color.rgba(), 0, 16);
 	ui->global_color->setStyleSheet(style_sheet);
+	vW->setGlobalColor(default_color);
+
+	// Set light
+	default_color = Qt::white;
+	style_sheet = QString("background-color: #%1;").arg(default_color.rgba(), 0, 16);
+	ui->light_color->setStyleSheet(style_sheet);
+	vW->setLightColor(default_color);
+	vW->setLightPositionX(ui->light_x->value());
+	vW->setLightPositionY(ui->light_y->value());
+	vW->setLightPositionZ(ui->light_z->value());
+	vW->setLightIntensity(ui->light_intensity->value());
+
+	// Set light model
+	vW->getLightModel().ambient = QVector3D(ui->ambient_red->value() / 255., ui->ambient_green->value() / 255., ui->ambient_blue->value() / 255.);
+	vW->getLightModel().diffuse = QVector3D(ui->diffuse_red->value() / 255., ui->diffuse_green->value() / 255., ui->diffuse_blue->value() / 255.);
+	vW->getLightModel().specular = QVector3D(ui->mirror_red->value() / 255., ui->mirror_green->value() / 255., ui->mirror_blue->value() / 255.);
+	vW->getLightModel().specular_sharpness = ui->mirror_sharpness->value();
+
+	// Set ambient color
+	default_color = Qt::red;
+	style_sheet = QString("background-color: #%1;").arg(default_color.rgba(), 0, 16);
+	ui->ambient_color->setStyleSheet(style_sheet);
+	vW->getLightModel().ambient_color = default_color;
 }
 
 // Event filters
@@ -75,7 +99,7 @@ void ThreeDViewer ::ViewerWidgetMouseButtonPress(ViewerWidget *w, QEvent *event)
 	if (e->button() == Qt::LeftButton)
 	{
 		vW->setIsCameraRotating(true);
-		vW->setLastMousePos(QPoint(e->x(), e->y()));
+		vW->setLastMousePos(e->position());
 	}
 }
 void ThreeDViewer ::ViewerWidgetMouseButtonRelease(ViewerWidget *w, QEvent *event)
@@ -93,7 +117,7 @@ void ThreeDViewer ::ViewerWidgetMouseMove(ViewerWidget *w, QEvent *event)
 
 	if (vW->getIsCameraRotating())
 	{
-		vW->rotateCamera(QPoint(e->x(), e->y()));
+		vW->rotateCamera(e->position());
 	}
 }
 void ThreeDViewer ::ViewerWidgetLeave(ViewerWidget *w, QEvent *event)
@@ -275,5 +299,28 @@ void ThreeDViewer ::on_global_color_clicked()
 		QString style_sheet = QString("background-color: #%1;").arg(newColor.rgba(), 0, 16);
 		ui->global_color->setStyleSheet(style_sheet);
 		vW->setGlobalColor(newColor);
+	}
+}
+
+void ThreeDViewer::on_light_color_clicked()
+{
+	QColor newColor = QColorDialog::getColor(vW->getLightColor(), this);
+	if (newColor.isValid())
+	{
+		QString style_sheet = QString("background-color: #%1;").arg(newColor.rgba(), 0, 16);
+		ui->light_color->setStyleSheet(style_sheet);
+		vW->setLightColor(newColor);
+	}
+}
+
+void ThreeDViewer::on_ambient_color_clicked()
+{
+	QColor newColor = QColorDialog::getColor(vW->getLightModel().ambient_color, this);
+	if (newColor.isValid())
+	{
+		QString style_sheet = QString("background-color: #%1;").arg(newColor.rgba(), 0, 16);
+		ui->ambient_color->setStyleSheet(style_sheet);
+		vW->getLightModel().ambient_color = newColor;
+		vW->redraw();
 	}
 }

@@ -12,6 +12,22 @@ struct Camera
     double center_of_projection;
 };
 
+struct LightSource
+{
+    QVector3D position;
+    QColor color;
+    int intensity;
+};
+
+struct LightModel
+{
+    QColor ambient_color;
+    QVector3D ambient;
+    QVector3D diffuse;
+    QVector3D specular;
+    double specular_sharpness;
+};
+
 class ViewerWidget : public QWidget
 {
     Q_OBJECT
@@ -35,7 +51,7 @@ private:
     uchar *data = nullptr;
     double *z_index = nullptr;
 
-    QColor globalColor = Qt::blue;
+    QColor globalColor;
     RasterizationAlgorithm rasterizationAlgorithm = DDA;
     ColoringType coloringType = WIREFRAME;
 
@@ -45,14 +61,20 @@ private:
     // Camera
     Camera camera;
     bool isCameraRotating = false;
-    QPoint last_mouse_pos;
+    QPointF last_mouse_pos;
+
+    // Light source
+    LightSource lightSource;
+
+    // Light model
+    LightModel lightModel;
 
 public:
     ViewerWidget(QSize imgSize, QWidget *parent = Q_NULLPTR);
     ~ViewerWidget();
     void resizeWidget(QSize size);
 
-    void setGlobalColor(QColor color) { globalColor = color; }
+    void setGlobalColor(QColor color);
     QColor getGlobalColor() { return globalColor; }
     void setColoringType(ColoringType type)
     {
@@ -86,19 +108,56 @@ public:
     void translateObject(QVector3D offset);
 
     //// Camera ////
-    void setCamera(QVector3D position, double zenit, double azimuth, double center_of_projection)
+    void setCamera(QVector3D position, double center_of_projection)
     {
         camera.position = position;
-        camera.zenit = zenit * M_PI / 180;
-        camera.azimuth = azimuth * M_PI / 180;
         camera.center_of_projection = center_of_projection;
+        clear();
+        drawObject();
+    }
+    void setCameraRotation(double zenith, double azimuth)
+    {
+        camera.zenit = zenith;
+        camera.azimuth = azimuth;
         clear();
         drawObject();
     }
     void setIsCameraRotating(bool isRotating) { isCameraRotating = isRotating; }
     bool getIsCameraRotating() { return isCameraRotating; }
-    void setLastMousePos(QPoint pos) { last_mouse_pos = pos; }
-    void rotateCamera(QPoint mouse_pos);
+    void setLastMousePos(QPointF pos) { last_mouse_pos = pos; }
+    void rotateCamera(QPointF mouse_pos);
+
+    //// Light ////
+    void setLightPositionX(double x)
+    {
+        lightSource.position.setX(x);
+        redraw();
+    }
+    void setLightPositionY(double y)
+    {
+        lightSource.position.setY(y);
+        redraw();
+    }
+    void setLightPositionZ(double z)
+    {
+        lightSource.position.setZ(z);
+        redraw();
+    }
+    void setLightColor(QColor color)
+    {
+        lightSource.color = color;
+        redraw();
+    }
+    void setLightIntensity(int intensity);
+    QColor getLightColor() { return lightSource.color; }
+
+    //// Light model ////
+    LightModel &getLightModel() { return lightModel; }
+    void printLightModel()
+    {
+        qDebug() << "Light model:" << lightModel.ambient << lightModel.diffuse << lightModel.specular << lightModel.specular_sharpness
+                 << lightModel.ambient_color;
+    }
 
     //// Drawing ////
 
@@ -121,10 +180,10 @@ public:
     void fillTriangle(std::vector<Vertex> polygon);
 
     // 3D Object
-    void drawObject() { drawObject(object, camera, coloringType); }
-    void drawObject(ThreeDObject obj, Camera camera, ColoringType coloring);
+    void drawObject() { drawObject(object, camera, lightSource, coloringType); }
+    void drawObject(ThreeDObject obj, Camera camera, LightSource light, ColoringType coloring);
     void transformToViewingCoordinates(ThreeDObject &object, Camera camera);
-    void transformToOrtograpicCoordinates(ThreeDObject &obj);
+    void calculateColors(ThreeDObject &object, LightSource light, Camera camera, ColoringType coloring);
     void transformToPerspectiveCoordinates(ThreeDObject &object, double center_of_projection);
     void drawObject(ThreeDObject *object, ColoringType coloring);
 
@@ -147,6 +206,7 @@ public:
 
     void delete_objects();
     void clear();
+    void redraw();
 
 public slots:
     void paintEvent(QPaintEvent *event) Q_DECL_OVERRIDE;
