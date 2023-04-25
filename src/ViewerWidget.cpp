@@ -798,9 +798,9 @@ void ViewerWidget::fillTriangle(std::vector<Vertex> polygon)
         return;
     }
 
-    if (e1.start.y == e1.end.y)
+    if ((int)(e1.start.y + 0.5) == (int)(e1.end.y + 0.5))
         return;
-    if (e2.start.y == e2.end.y)
+    if ((int)(e2.start.y + 0.5) == (int)(e2.end.y + 0.5))
         return;
 
     e1.dx = (double)(e1.end.x - e1.start.x) / (double)(e1.end.y - e1.start.y);
@@ -883,13 +883,13 @@ void ViewerWidget::transformToViewingCoordinates(ThreeDObject &object, Camera ca
 }
 void ViewerWidget::calculateColors(ThreeDObject &object, LightSource light, Camera camera, ColoringType coloring)
 {
-    QVector3D norm_v, ligh_v, refl_v, view_v;
+    QVector3D center, norm_v, ligh_v, refl_v, view_v;
 
     if (coloring == ColoringType::SIDE)
     {
         for (Face &face : object.faces)
         {
-            QVector3D center = face.center();
+            center = face.center();
             norm_v = face.normal().normalized();
             ligh_v = (light.position - center).normalized();
             refl_v = 2 * QVector3D::dotProduct(norm_v, ligh_v) * norm_v - ligh_v;
@@ -927,6 +927,57 @@ void ViewerWidget::calculateColors(ThreeDObject &object, LightSource light, Came
             if (final_light.z() > 1)
                 final_light.setZ(1);
             face.color = QColor(final_light.x() * 255, final_light.y() * 255, final_light.z() * 255);
+        }
+    }
+    else if (coloring == ColoringType::VERTEX)
+    {
+        for (Vertex &vertex : object.vertices)
+        {
+
+            for (Edge *edge : vertex.edges)
+            {
+                norm_v += edge->face->normal();
+            }
+            norm_v /= vertex.edges.size();
+            norm_v.normalize();
+
+            center = vertex.toVector3D();
+            ligh_v = (light.position - center).normalized();
+            refl_v = 2 * QVector3D::dotProduct(norm_v, ligh_v) * norm_v - ligh_v;
+            view_v = (QVector3D(0, 0, 400) - center).normalized();
+
+            QVector3D Ia, Id, Im;
+
+            // Ambient
+            Ia = QVector3D(lightModel.ambient_color.red() * lightModel.ambient.x() / 255.,
+                           lightModel.ambient_color.green() * lightModel.ambient.y() / 255.,
+                           lightModel.ambient_color.blue() * lightModel.ambient.z() / 255.);
+
+            // Diffuse
+            float diffuse = QVector3D::dotProduct(norm_v, ligh_v) * light.intensity / 100.;
+            if (diffuse > 0)
+                Id = diffuse * QVector3D(light.color.red() * lightModel.diffuse.x() / 255.,
+                                         light.color.green() * lightModel.diffuse.y() / 255.,
+                                         light.color.blue() * lightModel.diffuse.z() / 255.);
+
+            // Mirror
+            float mirror = QVector3D::dotProduct(refl_v, view_v) * light.intensity / 255.;
+            if (mirror > 0)
+            {
+                Im = pow(mirror, lightModel.specular_sharpness) *
+                     QVector3D(light.color.red() * lightModel.specular.x() / 255.,
+                               light.color.green() * lightModel.specular.y() / 255.,
+                               light.color.blue() * lightModel.specular.z() / 255.);
+            }
+
+            QVector3D final_light = Ia + Id + Im;
+            if (final_light.x() > 1)
+                final_light.setX(1);
+            if (final_light.y() > 1)
+                final_light.setY(1);
+            if (final_light.z() > 1)
+                final_light.setZ(1);
+            vertex.color = QColor(final_light.x() * 255, final_light.y() * 255, final_light.z() * 255);
         }
     }
 }

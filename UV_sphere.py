@@ -16,10 +16,10 @@ class Point:
 
 
 center = (0, 0)
-radius = 5
+radius = 100
 
-num_meridians = 30
-num_parallels = 30
+num_meridians = 10
+num_parallels = 10
 
 
 def generate_sphere_points():
@@ -116,4 +116,4 @@ def export_vtk(points, filename):
 
 if __name__ == '__main__':
     points = generate_sphere_points()
-    export_vtk(points, 'UVShere.vtk')
+    export_vtk(points, 'UVSphere.vtk')
