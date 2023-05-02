@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
 
-project(ThreeDViewer
+project(DigitalElevationModel
     LANGUAGES CXX
 )
 
@@ -53,5 +53,6 @@ if(APPLE)
 elseif(WIN32)
     add_custom_command(TARGET ${PROJECT_NAME}
                 POST_BUILD COMMAND "C:/Qt/${QT_VERSION}/${QT_COMPILER}/bin/windeployqt.exe" "${PROJECT_BINARY_DIR}"
+                "$(OutDir)$(TargetName)$(TargetExt)"
                 COMMENT "windeployqt executed...")
 endif()
