@@ -167,6 +167,13 @@ public:
             v.z *= factor;
         }
     }
+    void scaleZ(double factor)
+    {
+        for (auto &vertex : vertices)
+        {
+            vertex.z *= factor;
+        }
+    }
     void recolor(QColor color)
     {
         for (auto &v : vertices)

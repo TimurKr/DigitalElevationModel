@@ -88,9 +88,9 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-335</y>
+          <y>-168</y>
           <width>307</width>
-          <height>804</height>
+          <height>865</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_3">
@@ -162,15 +162,22 @@
             <string>Camera</string>
            </property>
            <layout class="QGridLayout" name="gridLayout_2">
-            <item row="3" column="1">
+            <item row="5" column="1">
              <widget class="QPushButton" name="camera_front">
               <property name="text">
                <string>FRONT</string>
               </property>
              </widget>
             </item>
-            <item row="1" column="1">
-             <widget class="QDoubleSpinBox" name="camera_y">
+            <item row="5" column="2">
+             <widget class="QPushButton" name="camera_right">
+              <property name="text">
+               <string>RIGHT</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="2">
+             <widget class="QDoubleSpinBox" name="camera_z">
               <property name="minimum">
                <double>-1000.000000000000000</double>
               </property>
@@ -179,28 +186,14 @@
               </property>
              </widget>
             </item>
-            <item row="0" column="0">
-             <widget class="QLabel" name="label_3">
+            <item row="2" column="1">
+             <widget class="QLabel" name="label_4">
               <property name="text">
-               <string>x:</string>
+               <string>y:</string>
               </property>
              </widget>
             </item>
             <item row="3" column="0">
-             <widget class="QPushButton" name="camera_top">
-              <property name="text">
-               <string>TOP</string>
-              </property>
-             </widget>
-            </item>
-            <item row="3" column="2">
-             <widget class="QPushButton" name="camera_right">
-              <property name="text">
-               <string>RIGHT</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="0">
              <widget class="QDoubleSpinBox" name="camera_x">
               <property name="minimum">
                <double>-1000.000000000000000</double>
@@ -210,27 +203,60 @@
               </property>
              </widget>
             </item>
-            <item row="0" column="1">
-             <widget class="QLabel" name="label_4">
-              <property name="text">
-               <string>y:</string>
-              </property>
-             </widget>
-            </item>
-            <item row="0" column="2">
+            <item row="2" column="2">
              <widget class="QLabel" name="label_5">
               <property name="text">
                <string>z:</string>
               </property>
              </widget>
             </item>
-            <item row="1" column="2">
-             <widget class="QDoubleSpinBox" name="camera_z">
+            <item row="3" column="1">
+             <widget class="QDoubleSpinBox" name="camera_y">
               <property name="minimum">
                <double>-1000.000000000000000</double>
               </property>
               <property name="maximum">
                <double>1000.000000000000000</double>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="0">
+             <widget class="QLabel" name="label_3">
+              <property name="text">
+               <string>x:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="5" column="0">
+             <widget class="QPushButton" name="camera_top">
+              <property name="text">
+               <string>TOP</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="0" colspan="3">
+             <widget class="QSlider" name="z_scale">
+              <property name="mouseTracking">
+               <bool>false</bool>
+              </property>
+              <property name="maximum">
+               <number>100</number>
+              </property>
+              <property name="singleStep">
+               <number>1</number>
+              </property>
+              <property name="value">
+               <number>100</number>
+              </property>
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="0" colspan="3">
+             <widget class="QLabel" name="label_17">
+              <property name="text">
+               <string>z-coordinate scale</string>
               </property>
              </widget>
             </item>

@@ -128,6 +128,10 @@ bool ViewerWidget::changeSize(int width, int height)
 void ViewerWidget::setPixel(int x, int y, float z, const QColor &color)
 {
     double current_z = z_index[y * width() + x];
+    if (x < 30 || color == QColor(0, 0, 0))
+    {
+        qDebug() << "som veľmi vlavo";
+    }
     if (z_index[y * width() + x] > z)
     {
         return;
@@ -178,7 +182,7 @@ void ViewerWidget::debugObject(ThreeDObject &object)
         qDebug() << "---------------------";
     }
 }
-void ViewerWidget::loadObject(QVector<QVector3D> vertices, QVector<QVector<unsigned int>> polygons)
+void ViewerWidget::loadObject(std::vector<QVector3D> vertices, std::vector<std::vector<unsigned int>> polygons)
 {
     object.clear();
 
@@ -267,6 +271,43 @@ void ViewerWidget::loadObject(QVector<QVector3D> vertices, QVector<QVector<unsig
     // Scale the object to fit the screen nicely
     double scaleX = 0.5 * std::fabs(width() / (maxX - minX + std::numeric_limits<float>::min()));
     double scaleY = 0.5 * std::fabs(height() / (maxY - minY + std::numeric_limits<float>::min()));
+    double scale = std::min(scaleX, scaleY);
+    double scaleZ = 0.5 * std::fabs(std::min(height(), width()) / (maxZ - minZ + std::numeric_limits<float>::min()));
+
+    // Add colors based on z
+    typedef struct
+    {
+        double t;
+        QColor color;
+    } Color;
+
+    std::vector<Color> gradient;
+    gradient.push_back({0.0, QColor(255, 0, 0)});   // red
+    gradient.push_back({0.5, QColor(255, 255, 0)}); // yellow
+    gradient.push_back({1.0, QColor(0, 255, 0)});   // green
+
+    for (Vertex &vertex : object.vertices)
+    {
+        double t = (vertex.z - minZ) / (maxZ - minZ);
+        for (int i = 1; i < gradient.size(); i++)
+        {
+            if (gradient[i - 1].t <= t && t <= gradient[i].t)
+            {
+                double dt = (t - gradient[i - 1].t) / (gradient[i].t - gradient[i - 1].t);
+                QColor color = QColor::fromRgbF(
+                    gradient[i - 1].color.redF() * (1 - dt) + gradient[i].color.redF() * dt,
+                    gradient[i - 1].color.greenF() * (1 - dt) + gradient[i].color.greenF() * dt,
+                    gradient[i - 1].color.blueF() * (1 - dt) + gradient[i].color.blueF() * dt);
+                vertex.color = color;
+                break;
+            }
+        }
+    }
+
+    for (Face &face : object.faces)
+    {
+        face.color = face.edge->origin->color;
+    }
 
     // Translate object to the middle of the coordinate system
     float x = (maxX + minX) / 2;
@@ -274,14 +315,17 @@ void ViewerWidget::loadObject(QVector<QVector3D> vertices, QVector<QVector<unsig
     float z = (maxZ + minZ) / 2;
 
     translateObject(QVector3D(-x, -y, -z));
-    object.scale(scaleX < scaleY ? scaleX : scaleY);
+    object.scale(scale);
+    object.scaleZ(scaleZ / scale);
     drawObject();
 }
 void ViewerWidget::translateObject(QVector3D offset)
 {
     object.translate(offset);
 }
-
+void ViewerWidget::scaleZCoordinates(double scale)
+{
+}
 //// CAMERA ////
 
 void ViewerWidget::rotateCamera(QPointF mouse_pos)
@@ -740,10 +784,17 @@ void ViewerWidget::fillTriangle(std::vector<Vertex> polygon)
     if (polygon.size() != 3)
         throw std::runtime_error("fillTriangle called with polygon.size() != 3");
 
+    // x and y are rounded here, to avoid rounding errors later on
+    for (auto &point : polygon)
+    {
+        point.x = (int)point.x + 0.5;
+        point.y = (int)point.y;
+    }
+
     std::sort(polygon.begin(), polygon.end(),
               [](Vertex a, Vertex b)
               {
-                  if ((int)a.y + 0.5 == (int)b.y + 0.5)
+                  if (a.y == b.y)
                       return a.x < b.x;
                   return a.y < b.y;
               });
@@ -757,7 +808,7 @@ void ViewerWidget::fillTriangle(std::vector<Vertex> polygon)
     Edge e1;
     Edge e2;
 
-    if ((int)(polygon[0].y + 0.5) == (int)(polygon[1].y + 0.5))
+    if (polygon[0].y == polygon[1].y)
     {
         // Filling the bottom flat triangle
         e1.start = polygon[0];
@@ -766,7 +817,7 @@ void ViewerWidget::fillTriangle(std::vector<Vertex> polygon)
         e2.start = polygon[1];
         e2.end = polygon[2];
     }
-    else if ((int)(polygon[1].y + 0.5) == (int)(polygon[2].y + 0.5))
+    else if (polygon[1].y == polygon[2].y)
     {
         // Filling the top flat triangle
         e1.start = polygon[0];
@@ -775,7 +826,7 @@ void ViewerWidget::fillTriangle(std::vector<Vertex> polygon)
         e2.start = polygon[0];
         e2.end = polygon[2];
     }
-    else if ((int)(polygon[0].y + 0.5) == (int)(polygon[2].y + 0.5))
+    else if (polygon[0].y == polygon[2].y)
     {
         // The triangle is a horizontal line, lets just skip it
         return;
@@ -798,18 +849,16 @@ void ViewerWidget::fillTriangle(std::vector<Vertex> polygon)
         return;
     }
 
-    if ((int)(e1.start.y + 0.5) == (int)(e1.end.y + 0.5))
+    if (e1.start.y == e1.end.y)
         return;
-    if ((int)(e2.start.y + 0.5) == (int)(e2.end.y + 0.5))
+    if (e2.start.y == e2.end.y)
         return;
 
-    e1.dx = (double)(e1.end.x - e1.start.x) / (double)(e1.end.y - e1.start.y);
-    e2.dx = (double)(e2.end.x - e2.start.x) / (double)(e2.end.y - e2.start.y);
+    e1.dx = (e1.end.x - e1.start.x) / (e1.end.y - e1.start.y);
+    e2.dx = (e2.end.x - e2.start.x) / (e2.end.y - e2.start.y);
 
     double x1 = e1.start.x;
     double x2 = e2.start.x;
-    // double z1 = e1.start.z;
-    // double z2 = e2.start.z;
     for (int y = e1.start.y + 0.5; y < e1.end.y; y++)
     {
         if (x1 != x2)
@@ -817,21 +866,17 @@ void ViewerWidget::fillTriangle(std::vector<Vertex> polygon)
             drawLine(
                 e1.start.interpolate(e1.end, (y - e1.start.y) / (e1.end.y - e1.start.y)),
                 e2.start.interpolate(e2.end, (y - e2.start.y) / (e2.end.y - e2.start.y)));
-            // drawLine(
-            //     QVector3D(x1, y, z1),
-            //     QVector3D(x2, y, z2),
-            //     color);
         }
         x1 += e1.dx;
         x2 += e2.dx;
-        // z1 += e1.dz;
-        // z2 += e2.dz;
     }
 }
 
 // 3D Object
 void ViewerWidget::drawObject(ThreeDObject obj, Camera camera, LightSource light, ColoringType coloring)
 {
+    obj.scaleZ(z_scale);
+
     if (obj.vertices.size() == 0)
         return;
     transformToViewingCoordinates(obj, camera);
@@ -905,9 +950,9 @@ void ViewerWidget::calculateColors(ThreeDObject &object, LightSource light, Came
             // Diffuse
             float diffuse = QVector3D::dotProduct(norm_v, ligh_v) * light.intensity / 100.;
             if (diffuse > 0)
-                Id = diffuse * QVector3D(light.color.red() * lightModel.diffuse.x() / 255.,
-                                         light.color.green() * lightModel.diffuse.y() / 255.,
-                                         light.color.blue() * lightModel.diffuse.z() / 255.);
+                Id = diffuse * QVector3D(face.color.red() * lightModel.diffuse.x() / 255.,
+                                         face.color.green() * lightModel.diffuse.y() / 255.,
+                                         face.color.blue() * lightModel.diffuse.z() / 255.);
 
             // Mirror
             float mirror = QVector3D::dotProduct(refl_v, view_v) * light.intensity / 255.;
@@ -949,9 +994,9 @@ void ViewerWidget::calculateColors(ThreeDObject &object, LightSource light, Came
             QVector3D Ia, Id, Im;
 
             // Ambient
-            Ia = QVector3D(lightModel.ambient_color.red() * lightModel.ambient.x() / 255.,
-                           lightModel.ambient_color.green() * lightModel.ambient.y() / 255.,
-                           lightModel.ambient_color.blue() * lightModel.ambient.z() / 255.);
+            Ia = QVector3D(vertex.color.red() * lightModel.ambient.x() / 255.,
+                           vertex.color.green() * lightModel.ambient.y() / 255.,
+                           vertex.color.blue() * lightModel.ambient.z() / 255.);
 
             // Diffuse
             float diffuse = QVector3D::dotProduct(norm_v, ligh_v) * light.intensity / 100.;

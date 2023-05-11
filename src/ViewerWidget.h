@@ -57,6 +57,7 @@ private:
 
     // Object
     ThreeDObject object;
+    double z_scale;
 
     // Camera
     Camera camera;
@@ -104,8 +105,19 @@ public:
 
     //// 3D Object ////
     void debugObject(ThreeDObject &object);
-    void loadObject(QVector<QVector3D> vertices, QVector<QVector<unsigned int>> polygons);
+    void loadObject(std::vector<QVector3D> vertices, std::vector<std::vector<unsigned int>> polygons);
     void translateObject(QVector3D offset);
+    void scaleObject(double scale)
+    {
+        object.scale(scale);
+        redraw();
+    }
+    void scaleZCoordinates(double scale);
+    void setZScale(double scale)
+    {
+        z_scale = scale;
+        redraw();
+    }
 
     //// Camera ////
     void setCamera(QVector3D position, double center_of_projection)

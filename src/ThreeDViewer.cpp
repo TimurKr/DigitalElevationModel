@@ -21,6 +21,7 @@ ThreeDViewer ::ThreeDViewer(QWidget *parent)
 	QString style_sheet = QString("background-color: #%1;").arg(default_color.rgba(), 0, 16);
 	ui->global_color->setStyleSheet(style_sheet);
 	vW->setGlobalColor(default_color);
+	vW->setZScale(1);
 
 	// Set light
 	default_color = Qt::white;
@@ -39,7 +40,7 @@ ThreeDViewer ::ThreeDViewer(QWidget *parent)
 	vW->getLightModel().specular_sharpness = ui->mirror_sharpness->value();
 
 	// Set ambient color
-	default_color = Qt::red;
+	default_color = Qt::white;
 	style_sheet = QString("background-color: #%1;").arg(default_color.rgba(), 0, 16);
 	ui->ambient_color->setStyleSheet(style_sheet);
 	vW->getLightModel().ambient_color = default_color;
@@ -162,61 +163,45 @@ int ThreeDViewer ::loadObject(QString filename)
 		return false;
 	}
 
+	std::vector<QVector3D> points;
+	std::vector<std::vector<unsigned int>> polygons;
+
 	QTextStream in(&file);
 	QString line = in.readLine();
-	// Wait for POINTS
-	while (!line.startsWith("POINTS"))
-	{
-		line = in.readLine();
-	}
 
-	// Handle POINTS
-	line = in.readLine();
-	QVector<QVector3D> points;
-	while (!line.startsWith("POLYGONS"))
+	while (!line.isNull())
 	{
 		QStringList list = line.split(" ");
-		QList<double> coordinates;
+		std::vector<double> coordinates;
 
 		// Try converting all strings to doubles
 		bool ok = true;
-		for (int i = 0; i < list.size(); i++)
+		for (auto coordinate : list)
 		{
-			coordinates.push_back(list[i].toDouble(&ok));
+			coordinates.push_back(coordinate.toDouble(&ok));
 			if (!ok)
 				return false;
 		}
-		points.push_back(QVector3D(coordinates[0], coordinates[1], coordinates[2]));
-		line = in.readLine();
-	}
-	// Wait for POLYGONS
-	while (!line.startsWith("POLYGONS"))
-	{
+
+		QVector3D point = QVector3D(coordinates[0], coordinates[1], coordinates[2]);
+
+		// Add coordinates to rawObject
+		points.push_back(point);
+
 		line = in.readLine();
 	}
 
-	// Handle POLYGONS
-	line = in.readLine();
-	QVector<QVector<unsigned int>> polygons;
-	while (!line.isEmpty())
-	{
-		QStringList list = line.split(" ");
-		QList<unsigned int> coordinates;
+	// Since we always have square input:
+	unsigned int n = sqrt(points.size());
 
-		// Try converting all strings to unsigned ints
-		bool ok = true;
-		for (int i = 0; i < list.size(); i++)
+	// Create polygons
+	for (unsigned int row = 1; row < n; row++)
+	{
+		for (unsigned int col = 1; col < n; col++)
 		{
-			coordinates.push_back(list[i].toUInt(&ok));
-			if (!ok)
-				return false;
+			polygons.push_back({(row - 1) * n + (col - 1), (row - 1) * n + col, row * n + col});
+			polygons.push_back({(row - 1) * n + (col - 1), row * n + col, row * n + (col - 1)});
 		}
-		polygons.push_back(QVector<unsigned int>());
-		for (int i = 1; i < coordinates.size(); i++)
-		{
-			polygons.back().push_back(coordinates[i]);
-		}
-		line = in.readLine();
 	}
 
 	vW->loadObject(points, polygons);
@@ -239,7 +224,7 @@ void ThreeDViewer ::on_actionOpen_triggered()
 	QString folder = settings.value("folder_img_load_path", "").toString();
 
 	// QString fileFilter = "Image data (*.bmp *.gif *.jpg *.jpeg *.png *.pbm *.pgm *.ppm .*xbm .* xpm);;All files (*)";
-	QString fileFilter = "VTK súbor (*.vtk)";
+	QString fileFilter = "Dat súbor (*.dat)";
 
 	QString fileName = QFileDialog::getOpenFileName(this, "Load object", folder, fileFilter);
 	if (fileName.isEmpty())

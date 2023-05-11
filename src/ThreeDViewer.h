@@ -78,6 +78,11 @@ private slots:
 	void on_camera_top_clicked() { vW->setCameraRotation(M_PI / 2, 0); }
 	void on_camera_front_clicked() { vW->setCameraRotation(0, 0); }
 	void on_camera_right_clicked() { vW->setCameraRotation(0, 3 * M_PI / 2); }
+	void on_z_scale_sliderMoved(int arg1)
+	{
+		qDebug() << arg1;
+		vW->setZScale(arg1 / 100.);
+	}
 
 	// Projection slots
 	void on_projection_type_currentIndexChanged(int index)
