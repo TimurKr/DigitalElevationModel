@@ -943,16 +943,16 @@ void ViewerWidget::calculateColors(ThreeDObject &object, LightSource light, Came
             QVector3D Ia, Id, Im;
 
             // Ambient
-            Ia = QVector3D(lightModel.ambient_color.red() * lightModel.ambient.x() / 255.,
-                           lightModel.ambient_color.green() * lightModel.ambient.y() / 255.,
-                           lightModel.ambient_color.blue() * lightModel.ambient.z() / 255.);
+            Ia = QVector3D(face.color.red() * lightModel.ambient.x() / 255.,
+                           face.color.green() * lightModel.ambient.y() / 255.,
+                           face.color.blue() * lightModel.ambient.z() / 255.);
 
             // Diffuse
             float diffuse = QVector3D::dotProduct(norm_v, ligh_v) * light.intensity / 100.;
             if (diffuse > 0)
-                Id = diffuse * QVector3D(face.color.red() * lightModel.diffuse.x() / 255.,
-                                         face.color.green() * lightModel.diffuse.y() / 255.,
-                                         face.color.blue() * lightModel.diffuse.z() / 255.);
+                Id = diffuse * QVector3D(light.color.red() * lightModel.diffuse.x() / 255.,
+                                         light.color.green() * lightModel.diffuse.y() / 255.,
+                                         light.color.blue() * lightModel.diffuse.z() / 255.);
 
             // Mirror
             float mirror = QVector3D::dotProduct(refl_v, view_v) * light.intensity / 255.;

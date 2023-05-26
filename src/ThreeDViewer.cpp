@@ -132,11 +132,11 @@ void ThreeDViewer ::ViewerWidgetWheel(ViewerWidget *w, QEvent *event)
 	QWheelEvent *wheelEvent = static_cast<QWheelEvent *>(event);
 	if (wheelEvent->angleDelta().y() > 0)
 	{
-		// vW->scaleObjects(1.1, 1.1);
+		vW->scaleObject(1.1);
 	}
 	else
 	{
-		// vW->scaleObjects(0.9, 0.9);
+		vW->scaleObject(0.9);
 	}
 }
 

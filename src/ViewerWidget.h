@@ -110,6 +110,7 @@ public:
     void scaleObject(double scale)
     {
         object.scale(scale);
+        camera.position *= scale;
         redraw();
     }
     void scaleZCoordinates(double scale);
